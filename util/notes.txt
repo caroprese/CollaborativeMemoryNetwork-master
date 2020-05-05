@@ -1,0 +1,78 @@
+TODO:
+Loss sul test set.
+
+N. users: 55187
+self.train_data.shape: (1500809, 2)
+ self.train_data.dtype: uint32
+type: <class 'numpy.ndarray'>
+DA: (1, 2)
+DB: (165561, 1)
+
+N. users: 55187
+self.train_data.shape: (1500809, 2)
+ self.train_data.dtype: uint32
+type: <class 'numpy.ndarray'>
+DA: (1500809, 1)
+DB: (165561, 1)
+
+exaples of scores:
+
+[
+0.94893473,  1.4707673 ,  1.8095796 ,  0.95484155,  2.9169102 ,
+1.0320004 ,  3.1084507 ,  6.1122627 ,  1.0983486 ,  4.6450124 ,
+1.6231369 ,  2.474905  ,  3.789923  ,  0.93579555,  3.2135792 ,
+8.61892   ,  6.0643897 ,  3.8373814 ,  2.2786853 ,  1.775607  ,
+2.6317255 ,  0.62402403,  2.1359658 ,  2.0267444 ,  1.5021122 ,
+2.964344  ,  2.4538026 ,  4.0331216 ,  2.5091352 ,  8.795919  ,
+2.386095  ,  3.4450278 ,  3.8043714 ,  1.3827993 ,  2.8703043 ,
+7.2345243 ,  4.879295  ,  3.4776201 ,  5.8057323 ,  1.7402297 ,
+4.994151  ,  2.6055593 ,  2.3464787 ,  3.789263  ,  3.706937  ,
+3.4370222 ,  4.6455126 ,  4.6545267 ,  5.020831  ,  1.2291791 ,
+1.7899935 ,  2.6402907 ,  0.872229  ,  2.8734722 ,  3.5253441 ,
+1.243755  ,  3.0448692 ,  2.3809037 ,  2.3419704 ,  2.2496037 ,
+1.7896076 ,  2.4807944 ,  6.9958353 ,  2.8705275 ,  1.980541  ,
+2.8092763 ,  3.779347  ,  3.5419843 ,  5.195135  ,  2.4200306 ,
+1.4092246 ,  2.1044881 ,  1.6563752 ,  1.7242072 ,  3.9005473 ,
+1.465383  ,  4.361409  ,  1.0993719 ,  0.71549773,  1.2713928 ,
+0.70027006,  3.589192  ,  5.4935303 ,  1.9527844 ,  3.6753697 ,
+4.54706   ,  3.2561405 ,  7.83424   ,  1.7423773 , -0.01406568,
+3.381032  ,  1.8049183 ,  4.4573965 ,  4.2952957 ,  6.598692  ,
+1.532598  ,  2.7704506 ,  3.9400222 ,  1.3982176 ,  2.0778365 ,
+10.20049
+]
+
+FOCAL
+[5] Loss: 0.0677 » » » » : : 2804it [00:22, 124.40it/s]
+[INFO:tensorflow]<<module>>:194: Epoch 5: Avg Loss/Batch 0.065172
+[INFO:tensorflow]<evaluate_model>:169:
+HR@1       0.3867 CUST_HR@1  0.2198 WEIGH_HR@1 0.2693 HITS@1     [696 331 133] NORM_HITS@1 [0.6  0.29 0.11] NDCG@1     0.3867
+HR@5       0.8040 CUST_HR@5  0.3686 WEIGH_HR@5 0.6178 HITS@5     [1749  498  165] NORM_HITS@5 [0.73 0.21 0.07] NDCG@5     0.6066
+HR@10      0.9370 CUST_HR@10 0.4341 WEIGH_HR@10 0.7386 HITS@10    [2126  517  168] NORM_HITS@10 [0.76 0.18 0.06] NDCG@10    0.6503
+Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): 0.06586169814690948
+
+OLD
+[5] Loss: 0.3209 » » » » : : 2804it [00:22, 124.20it/s]
+[INFO:tensorflow]<<module>>:194: Epoch 5: Avg Loss/Batch 0.317338
+[INFO:tensorflow]<evaluate_model>:169:
+HR@1       0.4050 CUST_HR@1  0.2304 WEIGH_HR@1 0.2833 HITS@1     [732 351 132] NORM_HITS@1 [0.6  0.29 0.11] NDCG@1     0.4050
+HR@5       0.8173 CUST_HR@5  0.3770 WEIGH_HR@5 0.6300 HITS@5     [1787  499  166] NORM_HITS@5 [0.73 0.2  0.07] NDCG@5     0.6231
+HR@10      0.9463 CUST_HR@10 0.4410 WEIGH_HR@10 0.7474 HITS@10    [2153  518  168] NORM_HITS@10 [0.76 0.18 0.06] NDCG@10    0.6655
+Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): 0.32356025493641694
+
+Popularity to Focal
+[5] Loss: 0.0335 » » » » : : 2804it [00:22, 124.74it/s]
+[INFO:tensorflow]<<module>>:194: Epoch 5: Avg Loss/Batch 0.027730
+[INFO:tensorflow]<evaluate_model>:173:
+HR@1       0.4237 CUST_HR@1  0.2407 WEIGH_HR@1 0.2993 HITS@1     [783 354 134] NORM_HITS@1 [0.62 0.28 0.11] NDCG@1     0.4237
+HR@5       0.8437 CUST_HR@5  0.3901 WEIGH_HR@5 0.6535 HITS@5     [1858  506  167] NORM_HITS@5 [0.73 0.2  0.07] NDCG@5     0.6466
+HR@10      0.9550 CUST_HR@10 0.4493 WEIGH_HR@10 0.7558 HITS@10    [2179  518  168] NORM_HITS@10 [0.76 0.18 0.06] NDCG@10    0.6833
+Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): 0.06107249302448084
+
+Popularity
+[5] Loss: 0.1379 » » » » : : 2804it [00:22, 125.18it/s]
+[INFO:tensorflow]<<module>>:194: Epoch 5: Avg Loss/Batch 0.141822
+[INFO:tensorflow]<evaluate_model>:173:
+HR@1       0.4333 CUST_HR@1  0.2462 WEIGH_HR@1 0.3074 HITS@1     [807 358 135] NORM_HITS@1 [0.62 0.28 0.1 ] NDCG@1     0.4333
+HR@5       0.8613 CUST_HR@5  0.3981 WEIGH_HR@5 0.6693 HITS@5     [1907  510  167] NORM_HITS@5 [0.74 0.2  0.06] NDCG@5     0.6606
+HR@10      0.9597 CUST_HR@10 0.4539 WEIGH_HR@10 0.7600 HITS@10    [2193  518  168] NORM_HITS@10 [0.76 0.18 0.06] NDCG@10    0.6930
+Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): 0.3012618427313864

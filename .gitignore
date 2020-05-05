@@ -1,0 +1,7 @@
+# Created by .ignore support plugin (hsz.mobi)
+console_last_loss.txt
+console_old_loss.txt
+console_paper_256.txt
+util/__pycache__/
+result/
+.idea/
