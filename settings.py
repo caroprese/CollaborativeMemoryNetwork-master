@@ -22,6 +22,11 @@ class Settings:
     max_y_aux_popularity: float = None
 
     loss_type = 2  # 0 original, 1 CNR first version, 2 CNR second version
+    k = 100
+    k_trainable = False
+
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
 
 
 def get_percentile(array, k):
@@ -49,7 +54,11 @@ def set_parameters(
         metrics_scale,
         metrics_percentile,
 
-        loss_type
+        loss_type,
+        k,
+        k_trainable,
+        low_popularity_threshold,
+        high_popularity_threshold
 ):
     Settings.normalized_popularity = normalized_popularity
 
@@ -65,12 +74,17 @@ def set_parameters(
     Settings.metrics_percentile = metrics_percentile
 
     Settings.loss_type = loss_type
+    Settings.k = k
+    Settings.k_trainable = k_trainable
+
+    Settings.low_popularity_threshold = low_popularity_threshold
+    Settings.high_popularity_threshold = high_popularity_threshold
 
     domain = np.linspace(0, 1, 1000)
     codomain = [y_aux_popularity(x) for x in domain]
     Settings.max_y_aux_popularity = max(codomain)
 
-    print(normalized_popularity,
+    print('Config parameters:', normalized_popularity,
 
           loss_alpha,
           loss_beta,
@@ -83,7 +97,9 @@ def set_parameters(
           metrics_scale,
           metrics_percentile,
 
-          loss_type, sep='\n- ')
+          loss_type,
+          k,
+          sep='\n- ')
 
 
 def sigmoid(x):

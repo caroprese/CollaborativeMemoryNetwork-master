@@ -1,6 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
 
+import settings
 from util.helper import GraphKeys, add_to_collection
 from util.layers import DenseLayer, LossLayer, OptimizerLayer, ModelBase
 
@@ -43,9 +44,20 @@ class PairwiseGMF(ModelBase):
         self.v = DenseLayer(1, False, tf.nn.relu, initializers=self._initializers,
                                             regularizers=self._regularizers, name='OutputVector')
         self.score = tf.squeeze(self.v(self._cur_user * self._cur_item))
-        negative_output = tf.squeeze(self.v(self._cur_user * self._cur_item_negative))
+        self.negative_output = tf.squeeze(self.v(self._cur_user * self._cur_item_negative))
         tf.add_to_collection(GraphKeys.PREDICTION, self.score)
-        self.loss = LossLayer()(self.score, negative_output)
+
+        parameter_k = None
+        if settings.Settings.loss_type == 2:
+            self.k = tf.Variable(settings.Settings.k, trainable=True, dtype=tf.float32, name='k')
+            parameter_k = self.k
+
+        self.loss = LossLayer()(self.score,
+                                self.negative_output,
+                                self.input_positive_items_popularity,
+                                self.input_negative_items_popularity,
+                                parameter_k)
+
         self._optimizer = OptimizerLayer(self.config.optimizer, clip=5.0,
                                          params={})
         self.train = self._optimizer(self.loss)
@@ -77,9 +89,18 @@ class PairwiseGMF(ModelBase):
     def _construct_placeholders(self):
         self.input_users = tf.placeholder(tf.int32, [None], 'UserID')
         self.input_items = tf.placeholder(tf.int32, [None], 'ItemID')
+
+        # LC > popularity of positive items
+        self.input_positive_items_popularity = tf.placeholder(tf.float32, [None], 'PositiveItemsPopularity')
+
         self.input_items_negative = tf.placeholder(tf.int32, [None], 'NegativeItemID')
+
+        # LC > popularity of negative items
+        self.input_negative_items_popularity = tf.placeholder(tf.float32, [None], 'NegativeItemsPopularity')
 
         # Add our placeholders
         add_to_collection(GraphKeys.PLACEHOLDER, [self.input_users,
                                                   self.input_items,
-                                                  self.input_items_negative])
+                                                  self.input_positive_items_popularity,
+                                                  self.input_items_negative,
+                                                  self.input_negative_items_popularity])

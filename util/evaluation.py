@@ -26,6 +26,10 @@ def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_ite
 
     for user, (pos_list, neg) in progress:
         for pos in pos_list:
+
+            if pos < 0:
+                continue
+
             # print('Processing (', user, ' ,', pos, ', ', neg, ')', sep='')
 
             item_indices = list(neg) + [pos]
@@ -130,19 +134,19 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
                    input_neighborhood_lengths_handle,
                    dropout_handle, score_op, max_neighbors, model,
                    EVAL_AT=[1, 5, 10]):
-    scores, items, out, loss = get_model_scores(sess, test_data, neighborhood, input_user_handle, input_item_handle,
-                                                input_neighborhood_handle,
-                                                input_neighborhood_lengths_handle,
-                                                dropout_handle, score_op, max_neighbors, model,
-                                                return_scores=True)
+    scores, items, out, test_loss = get_model_scores(sess, test_data, neighborhood, input_user_handle, input_item_handle,
+                                                     input_neighborhood_handle,
+                                                     input_neighborhood_lengths_handle,
+                                                     dropout_handle, score_op, max_neighbors, model,
+                                                     return_scores=True)
     # print('out:', out)
     # print('scores:', scores)
 
     '''
-    
-    n = number of users
-    scores = n x 100
-    items = n x 100
+     
+    n = number_of_users * number_of_positive_items_per_user
+    scores.shape = n x 100
+    items.shape = n x 100
     
     '''
 
@@ -152,10 +156,14 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
     ndcgs = []
     hits_list = []
     normalized_hits_list = []
+    hrs_low = []
+    hrs_medium = []
+    hrs_high = []
     s = '\n'
     for k in EVAL_AT:
-        hr, custom_hr, weighted_hr, ndcg, hits, normalized_hits = get_eval(scores, items, len(scores[0]) - 1, k)
+        hr, custom_hr, weighted_hr, ndcg, hits, normalized_hits, hr_low, hr_medium, hr_high, n_pop = get_eval(scores, items, len(scores[0]) - 1, k)
 
+        '''
         s += "{:<10} {:<3.4f} " \
              "{:<10} {:<3.4f} " \
              "{:<10} {:<3.4f} " \
@@ -163,16 +171,46 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
              "{:<10} {} " \
              "{:<10} {:.4f}\n". \
             format('HR@%s' % k, hr, 'CUST_HR@%s' % k, custom_hr, 'WEIGH_HR@%s' % k, weighted_hr, 'HITS@%s' % k, hits, 'NORM_HITS@%s' % k, normalized_hits, 'NDCG@%s' % k, ndcg)
+        '''
+
+        s += "{:<10} {:<3.4f} " \
+             "{:<10} {:<3.4f} " \
+             "{:<10} {:<3.4f} " \
+             "{:<10} {:<3.4f} " \
+             "{:<10} {:<3.4f} " \
+             "{:<10} {} " \
+             "{:<10} {} \n". \
+            format('HR@%s' % k, hr,
+                   'HR_LOW@%s' % k, hr_low,
+                   'HR_MED@%s' % k, hr_medium,
+                   'HR_HIGH@%s' % k, hr_high,
+                   'WEIGH_HR@%s' % k, weighted_hr,
+                   'HITS@%s' % k, hits,
+                   'N_POP@%s' % k, n_pop)
+
         hrs.append(hr)
         custom_hrs.append(custom_hr)
         weighted_hrs.append(weighted_hr)
         ndcgs.append(ndcg)
         hits_list.append(hits)
         normalized_hits_list.append(normalized_hits)
-    s += "Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): " + str(loss)
+        hrs_low.append(hr_low)
+        hrs_medium.append(hr_medium)
+        hrs_high.append(hr_high)
+
+    s += "Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): " + str(test_loss)
     tf.logging.info(s + '\n')
 
-    return hrs, custom_hrs, weighted_hrs, ndcgs, hits_list, normalized_hits_list
+    return hrs, \
+           custom_hrs, \
+           weighted_hrs, \
+           ndcgs, \
+           hits_list, \
+           normalized_hits_list, \
+           test_loss, \
+           hrs_low, \
+           hrs_medium, \
+           hrs_high
 
 
 def get_eval(scores, items, index, top_n=10):
@@ -191,6 +229,28 @@ def get_eval(scores, items, index, top_n=10):
     hits = np.array([0, 0, 0])
 
     assert len(scores[0]) > index and index >= 0
+    # print(items)
+    items_to_guess = np.array(items)[:, index]
+    # print(items_to_guess.shape)
+
+    assert len(items) == items_to_guess.shape[0]
+
+    n_low = 0
+    n_medium = 0
+    n_high = 0
+
+    for j in range(len(items_to_guess)):
+        current_item = items_to_guess[j]
+        current_popularity = Settings.normalized_popularity[current_item]
+        if current_popularity <= Settings.low_popularity_threshold:
+            n_low += 1
+        elif Settings.low_popularity_threshold < current_popularity <= Settings.high_popularity_threshold:
+            n_medium += 1
+        else:
+            n_high += 1
+
+    # print('len(scores):', len(scores))
+    assert n_low + n_medium + n_high == len(scores)
 
     # for score in scores:
     for i in range(len(scores)):
@@ -229,10 +289,11 @@ def get_eval(scores, items, index, top_n=10):
 
             # Custom HR
             weighted_hr += (1 - current_popularity)
+
             # weighted_hr += sigmoid(1 / (current_popularity + eps))
-            if current_popularity <= 0.33:
+            if current_popularity <= Settings.low_popularity_threshold:
                 hits[0] += 1
-            elif current_popularity > 0.33 and current_popularity <= 0.66:
+            elif Settings.low_popularity_threshold < current_popularity <= Settings.high_popularity_threshold:
                 hits[1] += 1
             else:
                 hits[2] += 1
@@ -240,4 +301,13 @@ def get_eval(scores, items, index, top_n=10):
     # print('HITS:', hr)
     # print('len(scores):', len(scores))
 
-    return hr / len(scores), custom_hr / len(scores), weighted_hr / len(scores), ndcg / len(scores), hits, np.around(hits / np.sum(hits), 2)
+    return hr / len(scores), \
+           custom_hr / len(scores), \
+           weighted_hr / len(scores), \
+           ndcg / len(scores), \
+           hits, \
+           np.around(hits / np.sum(hits), 2), \
+           hits[0] / n_low, \
+           hits[1] / n_medium, \
+           hits[2] / n_high, \
+           [n_low, n_medium, n_high]

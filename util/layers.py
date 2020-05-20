@@ -15,8 +15,8 @@ from .helper import GraphKeys, OPTIMIZER
 
 
 # def _bpr_loss(positive, negative, name=None, popularity=None):
-def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popularity, name=None):
-    r"""
+def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popularity, k, name=None):
+    """
     Pairwise Loss from Bayesian Personalized Ranking.
 
     \log \sigma(pos - neg)
@@ -35,7 +35,7 @@ def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popu
     :returns: mean loss
     """
 
-    with tf.name_scope(name, 'BPRLoss', [positive, negative, positive_items_popularity, negative_items_popularity]) as scope:
+    with tf.name_scope(name, 'BPRLoss', [positive, negative, positive_items_popularity, negative_items_popularity, k]) as scope:
         # Numerical stability
         eps = 1e-15
 
@@ -47,19 +47,23 @@ def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popu
             g = tf.tanh(Settings.loss_alpha * positive_items_popularity) + \
                 Settings.loss_scale * f * tf.exp(-1 / (2 * (Settings.loss_beta ** 2)) * tf.square(positive_items_popularity - Settings.loss_percentile))
         else:
-            # g = 1 / (positive_items_popularity + eps)
-            # g = (negative_items_popularity + 1) / (positive_items_popularity + 1)
+            # g = 1 / (positive_items_popularity + 0.001)
+            # k = 10000
+            g = k / (positive_items_popularity + 1)
+            # g = k / (positive_items_popularity + eps)
+            # g = k * (negative_items_popularity + 1) / (positive_items_popularity + 1)
             # g = (1 - positive_items_popularity)
             # g = (negative_items_popularity) / (positive_items_popularity + eps)
             # g = (positive_items_popularity) / (negative_items_popularity + eps)
-            g = (1 / (positive_items_popularity + eps))
+            # g = (1000 / (positive_items_popularity + 1))
             # g = 1
             # g = 1
-            # g = negative_items_popularity - positive_items_popularity
+            # g = k * (negative_items_popularity - positive_items_popularity)
             # g = negative_items_popularity - positive_items_popularity
             # g = (negative_items_popularity - positive_items_popularity + 1) / 2
             # g = 1/(positive_items_popularity-(1-negative_items_popularity))
             # g = tf.pow(positive_items_popularity, 2)
+            pass
 
         difference = positive - negative
 
@@ -70,15 +74,30 @@ def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popu
             loss = -tf.math.log_sigmoid(g * difference + eps)
         else:
             # loss = -tf.log(tf.nn.sigmoid(difference) + eps) - tf.log(g)
-            loss = -tf.math.log_sigmoid(g * difference + eps)
+            # loss = -k * tf.math.log_sigmoid(difference / (positive_items_popularity))
+            # loss = -k * difference
+            # loss = k * positive_items_popularity * tf.exp(difference)
+            # loss = -k * positive_items_popularity * tf.math.log_sigmoid(difference)
+
+            # loss = -tf.math.log_sigmoid(g*difference)+tf.log(k+1)
+            loss = -tf.math.log_sigmoid(g * difference)
+
             # tf.math.log_sigmoid
             # loss = -tf.log(tf.nn.sigmoid(difference) + eps) - tf.log(tf.nn.sigmoid(g) + eps)
             # loss = -tf.pow(1 - tf.nn.sigmoid(g * difference + eps), 3) * tf.math.log_sigmoid(g * difference + eps)
+            # loss = -k * tf.math.log_sigmoid(positive * positive_items_popularity - negative)
+            # loss = -k * tf.math.log_sigmoid(positive - negative)*(positive_items_popularity)
+            # loss = -k * tf.math.log_sigmoid((positive - negative))/positive_items_popularity
+            # loss = -tf.math.log_sigmoid(g * (positive - negative))
+            # FOCAL LOSS:
+            # loss = -k * tf.pow(1 - tf.nn.sigmoid(difference), 3) * tf.math.log_sigmoid(difference)
+
             # loss = -tf.log(tf.nn.sigmoid((tf.pow(positive, 1 / positive_items_popularity) - negative)) + eps)
             # loss = tf.nn.sigmoid(negative_items_popularity - positive_items_popularity) * (-tf.log(tf.nn.sigmoid((positive - negative)) + eps))
             # loss = -tf.log(tf.nn.sigmoid( (positive/positive_items_popularity - negative)) + eps)
-            # =====================================================================
+            pass
 
+        # return tf.reduce_mean(loss, name=scope) + tf.log(k + 1)
         return tf.reduce_mean(loss, name=scope)
 
 
@@ -96,7 +115,7 @@ class LossLayer(snt.AbstractModule):
         """
         super(LossLayer, self).__init__(name=name)
 
-    def _build(self, positive_scores, negative_scores, positive_items_popularity, negative_items_popularity):
+    def _build(self, positive_scores, negative_scores, positive_items_popularity, negative_items_popularity, k):
         """
 
         :param positive_scores: predicted value
@@ -105,8 +124,9 @@ class LossLayer(snt.AbstractModule):
         """
 
         graph_regularizers = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-
-        self._loss = tf.squeeze(_bpr_loss(positive_scores, negative_scores, positive_items_popularity, negative_items_popularity))
+        # LC > new parameter
+        # self.k = tf.Variable(float(10000), trainable=True, dtype=tf.float32)
+        self._loss = tf.squeeze(_bpr_loss(positive_scores, negative_scores, positive_items_popularity, negative_items_popularity, k))
 
         self._regularization = None
         self._loss_no_regularization = self._loss
@@ -296,8 +316,8 @@ class ModelBase(object):
         self.config = config
         self._global_step = tf.contrib.framework.get_or_create_global_step()
         with tf.name_scope("LearningRateDecay"):
-            self.learning_rate = tf.Variable(float(config.learning_rate),
-                                             trainable=False, dtype=tf.float32)
+            self.learning_rate = tf.Variable(float(config.learning_rate), trainable=False, dtype=tf.float32)
+
             # Placeholder to decay learning rate by some amount
             self._learning_rate_decay_factor = tf.placeholder(tf.float32,
                                                               name='LearningRateDecayFactor')

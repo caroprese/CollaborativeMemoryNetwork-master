@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 '''
 @author:   Travis A. Ebesu
 @created:  2017-03-30
 @summary:
 '''
+
 import os
 import argparse
 import random
@@ -23,29 +25,71 @@ from logging.config import dictConfig
 from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 
+# Parameters ------------------------------------
+baseline = False
+pinterest = False
+
+gpu = '1'
+limit = 500
+
+
+use_popularity = not baseline  # True (!) False e' la baseline. [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
+load_pretrained_embeddings = True  # Load pretrained embeddings
+use_preprocess = not pinterest   # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
+
+if pinterest and not baseline:
+    rebuild = True  # True for pinterest dataset when 3 positive items per user will be used, False for movielens dataset
+else:
+    rebuild = False
+
+if baseline:
+    loss_type = 0  # 2 (!) 0: old loss; 1: custom loss; 2: new loss
+else:
+    loss_type = 2
+
+k = 300  # a pameter for the new loss
+k_trainable = False
+
+loss_alpha = 200
+loss_beta = 0.02
+loss_scale = 1
+metrics_alpha = 100
+metrics_beta = 0.03
+metrics_gamma = 5
+metrics_scale = 1 / 15
+metrics_percentile = 0.45
+# -----------------------------------------------
+
 parser = argparse.ArgumentParser(parents=[get_optimizer_argparse()], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, required=True)
 parser.add_argument('--iters', help='Max iters', type=int, default=30)
 # parser.add_argument('--iters', help='Max iters', type=int, default=3)
-parser.add_argument('-b', '--batch_size', help='Batch Size', type=int, default=32)
-parser.add_argument('-e', '--embedding', help='Embedding Size', type=int, default=50)
+parser.add_argument('-b', '--batch_size', help='Batch Size', type=int, default=256)
+parser.add_argument('-e', '--embedding', help='Embedding Size', type=int, default=50)  # 50
 parser.add_argument('--dataset', help='path to file', type=str, required=True)
 parser.add_argument('--hops', help='Number of hops/layers', type=int, default=2)
-parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=4)
-# parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=24)
+if baseline:
+    parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=4)
+else:
+    parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=2)  # (2)!
 parser.add_argument('--l2', help='l2 Regularization', type=float, default=0.1)
 parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory',
                     type=str, default=None)
 parser.add_argument('--resume', help='Resume existing from logdir', action="store_true")
-parser.add_argument('--pretrain', help='Load pretrained user/item embeddings', type=str,
-                    required=True)
-parser.set_defaults(optimizer='rmsprop', learning_rate=0.00001, decay=0.9, momentum=0.9)  # se learning_rate=0.0001 le cose vanno meglio
-# parser.set_defaults(optimizer='adam', learning_rate=0.001, decay=0.9, momentum=0.9)
+parser.add_argument('--pretrain', help='Load pretrained user/item embeddings', type=str, required=True)
+if baseline:
+    parser.set_defaults(optimizer='rmsprop', learning_rate=0.001, decay=0.9, momentum=0.9)  # 0.001 e' la baseline. Se learning_rate=0.0001 le cose vanno meglio con la nuova loss
+else:
+    parser.set_defaults(optimizer='rmsprop', learning_rate=0.0001, decay=0.9, momentum=0.9)
 
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'  # FLAGS.gpu
+if use_preprocess:
+    FLAGS.pretrain = 'pretrain/movielens_e50.npz'
+FLAGS.gpu = gpu
+
+os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
 
 randomness = False
 if not randomness:
@@ -99,31 +143,33 @@ if FLAGS.resume:
 
 dictConfig(get_logging_config(config.logdir))
 
-# TODO LC > Use the popularity to define a negative item
-use_popularity = False
-dataset = Dataset(config.filename, limit=None, rebuild=True)  # 55187
+dataset = Dataset(config.filename,
+                  limit=limit,
+                  rebuild=rebuild,
+                  use_preprocess=use_preprocess)
+set_parameters(
+    normalized_popularity=dataset.normalized_popularity,
+    loss_alpha=loss_alpha,
+    loss_beta=loss_beta,
+    loss_scale=loss_scale,
+    loss_percentile=get_percentile(dataset.normalized_popularity, 45),
+    metrics_alpha=metrics_alpha,
+    metrics_beta=metrics_beta,
+    metrics_gamma=metrics_gamma,
+    metrics_scale=metrics_scale,
+    metrics_percentile=metrics_percentile,
+    loss_type=loss_type,
+    k=k,
+    k_trainable=k_trainable,
+    low_popularity_threshold=0.05,
+    high_popularity_threshold=0.25
+)
 
 config.item_count = dataset.item_count
 config.user_count = dataset.user_count
 config.save_directory = config.logdir
 config.max_neighbors = dataset._max_user_neighbors
 tf.logging.info("\n\n%s\n\n" % config)
-
-# LC > settings ---------------------------------------------------------------
-set_parameters(
-    normalized_popularity=dataset.normalized_popularity,
-    loss_alpha=200,
-    loss_beta=0.02,
-    loss_scale=1,
-    loss_percentile=get_percentile(dataset.normalized_popularity, 45),
-    metrics_alpha=100,
-    metrics_beta=0.03,
-    metrics_gamma=5,
-    metrics_scale=1 / 15,
-    metrics_percentile=0.45,
-    loss_type=0
-)
-# -----------------------------------------------------------------------------
 
 if not FLAGS.resume:
     config.save()
@@ -134,10 +180,10 @@ model = CollaborativeMemoryNetwork(config)
 sv = tf.train.Supervisor(logdir=config.logdir, save_model_secs=60 * 10,
                          save_summaries_secs=0)
 
-sess = sv.prepare_or_wait_for_session(config=tf.ConfigProto(
-    gpu_options=tf.GPUOptions(allow_growth=True)))
+sess = sv.prepare_or_wait_for_session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
 
-if not FLAGS.resume:
+print('FLAGS.resume:', FLAGS.resume)
+if not FLAGS.resume and load_pretrained_embeddings:
     pretrain = np.load(FLAGS.pretrain)
 
     sess.graph._unsafe_unfinalize()
@@ -146,8 +192,11 @@ if not FLAGS.resume:
         model.user_memory.embeddings.assign(pretrain['user'] * 0.5),
         model.item_memory.embeddings.assign(pretrain['item'] * 0.5)
     ])
+else:
+    sess.graph._unsafe_unfinalize()
 
 # Train Loop
+results = []
 for i in range(FLAGS.iters):
     if sv.should_stop():
         break
@@ -187,22 +236,41 @@ for i in range(FLAGS.iters):
             print('neg_neighborhoods:\n', neg_neighborhoods)
             print('neg_neighborhood_length:\n', neg_neighborhood_length)
 
-        batch_loss, _ = sess.run([model.loss, model.train], feed)
+        if settings.Settings.loss_type == 2:
+            batch_loss, _, parameter_k = sess.run([model.loss, model.train, model.k], feed)
+        else:
+            parameter_k = 0
+            batch_loss, _ = sess.run([model.loss, model.train], feed)
+
         loss.append(batch_loss)
-        progress.set_description(u"[{}] Loss (type={}): {:,.4f} » » » » ".format(i, settings.Settings.loss_type, batch_loss))
+        progress.set_description(u"[{}] Loss (type={}, k={}): {:,.4f} » » » » ".format(i, settings.Settings.loss_type, parameter_k, batch_loss))
 
     tf.logging.info("Epoch {}: Avg Loss/Batch {:<20,.6f}".format(i, np.mean(loss)))
-    evaluate_model(sess,
-                   dataset.test_data,
-                   dataset.item_users_list,
-                   model.input_users,
-                   model.input_items,
-                   model.input_neighborhoods,
-                   model.input_neighborhood_lengths,
-                   model.dropout,
-                   model.score,
-                   config.max_neighbors,
-                   model)
+    hrs, custom_hrs, weighted_hrs, ndcgs, hits_list, normalized_hits_list, test_loss, hrs_low, hrs_medium, hrs_high = evaluate_model(sess,
+                                                                                                                                     dataset.test_data,
+                                                                                                                                     dataset.item_users_list,
+                                                                                                                                     model.input_users,
+                                                                                                                                     model.input_items,
+                                                                                                                                     model.input_neighborhoods,
+                                                                                                                                     model.input_neighborhood_lengths,
+                                                                                                                                     model.dropout,
+                                                                                                                                     model.score,
+                                                                                                                                     config.max_neighbors,
+                                                                                                                                     model)
+    results.append([np.mean(loss), test_loss, hrs[1], hrs_low[1], hrs_medium[1], hrs_high[1]])
+    print('____________________________________________________________________')
+    print('RESULTS AT Epoch {} ({}):'.format(i, 'movielens' if use_preprocess else 'pinterest'))
+    print('Ep.\t\tLoss\t\t\tTest Loss\t\t\t\tHR@5\t\tHR_LOW@5\tHR_MED@5\tHR_HIGH@5')
+    for row in range(len(results)):
+        print(row,
+              str(results[row][0]),
+              str(results[row][1]),
+              str(round(results[row][2], 4)),
+              str(round(results[row][3], 4)),
+              str(round(results[row][4], 4)),
+              str(round(results[row][5], 4)),
+              sep='\t\t')
+    print('____________________________________________________________________')
 
 EVAL_AT = range(1, 11)
 hrs, custom_hrs, weighted_hrs, ndcgs, hits_list, normalized_hits_list = [], [], [], [], [], []
@@ -221,24 +289,29 @@ scores, items, out, loss = get_model_scores(sess,
                                             True)
 
 for k in EVAL_AT:
-    hr, custom_hr, weighted_hr, ndcg, hits, normalized_hits = get_eval(scores, items, len(scores[0]) - 1, k)
+    hr, custom_hr, weighted_hr, ndcg, hits, normalized_hits, hr_low, hr_medium, hr_high, n_pop = get_eval(scores, items, len(scores[0]) - 1, k)
     hrs.append(hr)
     custom_hrs.append(custom_hr)
     weighted_hrs.append(weighted_hr)
     hits_list.append(hits)
     normalized_hits_list.append(normalized_hits)
     ndcgs.append(ndcg)
+
     s += "{:<10} {:<3.4f} " \
          "{:<10} {:<3.4f} " \
          "{:<10} {:<3.4f} " \
+         "{:<10} {:<3.4f} " \
+         "{:<10} {:<3.4f} " \
          "{:<10} {} " \
-         "{:<10} {} " \
-         "{:<10} {:.4f}\n".format('HR@%s' % k, hr,
-                                  'CUSTOM_HR@%s' % k, custom_hr,
-                                  'WEIGHTED_HR@%s' % k, weighted_hr,
-                                  'HITS@%s' % k, str(hits),
-                                  'NORM_HITS@%s' % k, str(normalized_hits),
-                                  'NDCG@%s' % k, ndcg)
+         "{:<10} {} \n". \
+        format('HR@%s' % k, hr,
+               'HR_LOW@%s' % k, hr_low,
+               'HR_MED@%s' % k, hr_medium,
+               'HR_HIGH@%s' % k, hr_high,
+               'WEIGHTED_HR@%s' % k, weighted_hr,
+               'HITS@%s' % k, str(hits),
+               'N_POP@%s' % k, str(n_pop))
+
 s += "Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): " + str(loss)
 tf.logging.info(s)
 

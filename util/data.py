@@ -1,20 +1,34 @@
 import numpy as np
 from collections import defaultdict
 
+from dataset_manager import preprocess_dataset
+
 
 class Dataset(object):
     count = 0
 
-    def __init__(self, filename, limit=None, rebuild=False):
+    def __init__(self, filename, limit=None, rebuild=False, use_preprocess=False):
         """
         Wraps dataset and produces batches for the model to consume
 
         :param filename: path to training data for npz file
         """
-        self._data = np.load(filename)
 
-        self.train_data = self._data['train_data'][:, :2]
-        self.test_data = self._data['test_data'].tolist()
+        # Se rebuild=False i dataset (train e test) sono identici a prima
+        # Ora pero' il dataset di test e' copiato in un nuovo dataset (validation)
+        # Se rebuild=True sono alterati i dataset di training e di test.
+
+        if use_preprocess:
+            self.train_data, self.test_data = preprocess_dataset()
+        else:
+            self._data = np.load(filename)
+            # print(str(self._data)[:200])
+
+            self.train_data = self._data['train_data'][:, :2]
+            self.test_data = self._data['test_data'].tolist()
+
+        # print(self.train_data)
+        # print(self.test_data)
 
         # Shallow copy
         self.validation_data = self.test_data.copy()
@@ -33,8 +47,9 @@ class Dataset(object):
             # assert len(self.train_data) - b == len(self.test_data)
         else:
             # To avoid a weird error
-            for user in self.test_data:
-                self.test_data[user] = ([self.test_data[user][0]], self.test_data[user][1])
+            if not use_preprocess:
+                for user in self.test_data:
+                    self.test_data[user] = ([self.test_data[user][0]], self.test_data[user][1])
 
         self._n_users, self._n_items = self.train_data.max(axis=0) + 1
 
@@ -74,7 +89,7 @@ class Dataset(object):
         # print(list(self.test_data.keys())[:100])
         # ---------------------------------------------------------------------
 
-        if rebuild:
+        if rebuild and not use_preprocess:
             self.test_data = {}
             rows_to_delete = []
 
@@ -82,18 +97,27 @@ class Dataset(object):
                 if user % 1000 == 0:
                     print('Processing user {}'.format(user))
 
-                items = np.array(list(self.user_items[user]))
+                items = np.array(list(self.user_items[user]), dtype=np.int32)
                 items_popularity = self.normalized_popularity[items]
                 sorted_items = items[np.argsort(items_popularity)]
-
-                less_popular_item = sorted_items[0]
-                medium_popular_item = sorted_items[round(len(sorted_items) / 2) - 1]
-                most_popular_item = sorted_items[-1]
 
                 '''
                 print('Items for user {}:'.format(user), items)
                 print('Items popularity:'.format(user), items_popularity)
                 print('Sorted items:'.format(user), sorted_items)
+                '''
+
+                try:
+                    less_popular_item = sorted_items[0]
+                    medium_popular_item = sorted_items[round(len(sorted_items) / 2) - 1]
+                    most_popular_item = sorted_items[-1]
+                except:
+                    print('Items for user {}:'.format(user), items)
+                    print('Items popularity:'.format(user), items_popularity)
+                    print('Sorted items:'.format(user), sorted_items)
+                    pass
+
+                '''
                 print('Less popular object:', less_popular_item)
                 print('Medium popular object:', medium_popular_item)
                 print('Most popular object:', most_popular_item)
@@ -180,11 +204,12 @@ class Dataset(object):
         positive_items = self.user_items[user_id]
         more_popular_positive_items = set()
         if item is not None:
+            # objects more popular than 'item'
             more_popular_positive_items = np.array(list(filter(lambda x: self.normalized_popularity[x] > self.normalized_popularity[item], positive_items)), dtype=np.uint32)
 
-            # ordering more_popular_positive_items by popularity
+            # ordering more_popular_positive_items by popularity (DESC)
             more_popular_positive_items_popularity = self.normalized_popularity[more_popular_positive_items]
-            more_popular_positive_items = more_popular_positive_items[np.argsort(-1 * more_popular_positive_items_popularity)]
+            more_popular_positive_items = more_popular_positive_items[np.argsort(more_popular_positive_items_popularity)]
 
         if item is None or len(more_popular_positive_items) == 0:
             n = self._sample_item()
@@ -196,16 +221,23 @@ class Dataset(object):
                 n = self._sample_item()
         else:
             # TODO LC > Dealing with popularity
-
+            select_most_popular_first = True  # True = current experiments
             selected_index = int(index / (upper_bound - 1) * len(more_popular_positive_items))
+
+            if select_most_popular_first:
+                selected_index = len(more_popular_positive_items) - 1 - selected_index
+
             n = more_popular_positive_items[selected_index]
 
             verbose = False
             if verbose:
                 print('---------------------------------------')
+                print('index:', index)
+                print('upper_bound:', upper_bound)
                 print('item:', item)
                 print('positive_items:', positive_items)
                 print('more_popular_positive_items:', more_popular_positive_items)
+                print('np.sort(more_popular_positive_items_popularity)):', np.sort(more_popular_positive_items_popularity))
                 print('selected_index:', selected_index)
                 print('selected item (n):', n)
                 print('---------------------------------------')
@@ -260,7 +292,7 @@ class Dataset(object):
                         neg_item_idx = self._sample_negative_item(user_idx)
                     else:
                         # selecting a positive but more popular item (if there is one)
-                        neg_item_idx = self._sample_negative_item(user_idx, item_idx, i / 2, neg_count)
+                        neg_item_idx = self._sample_negative_item(user_idx, item_idx, i, neg_count)
                 else:
                     neg_item_idx = self._sample_negative_item(user_idx)
                 batch[idx, :] = [user_idx, item_idx, neg_item_idx]

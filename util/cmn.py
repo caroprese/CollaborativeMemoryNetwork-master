@@ -1,5 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
+
+import settings
 from util.helper import GraphKeys, add_to_collection
 from util.layers import LossLayer, OptimizerLayer, ModelBase, DenseLayer
 from util.attention import VariableLengthMemoryLayer
@@ -73,9 +75,17 @@ class CollaborativeMemoryNetwork(ModelBase):
 
         # Loss and Optimizer
         # self.loss = LossLayer()(self.score, negative_output)
+
+        parameter_k = None
+        if settings.Settings.loss_type == 2:
+            self.k = tf.Variable(settings.Settings.k, trainable=settings.Settings.k_trainable, dtype=tf.float32, name='k')
+            parameter_k = self.k
+
         self.loss = LossLayer()(self.score,
                                 self.negative_output,
-                                self.input_positive_items_popularity, self.input_negative_items_popularity)
+                                self.input_positive_items_popularity,
+                                self.input_negative_items_popularity,
+                                parameter_k)
 
         self._optimizer = OptimizerLayer(self.config.optimizer, clip=self.config.grad_clip,
                                          params=self.config.optimizer_params)
@@ -103,10 +113,13 @@ class CollaborativeMemoryNetwork(ModelBase):
         self.input_neighborhoods_negative = tf.placeholder(tf.int32, [None, None], 'NeighborhoodNeg')  # X
 
         self.input_neighborhood_lengths_negative = tf.placeholder(tf.int32, [None], 'NeighborhoodLengthIDNeg')  # X
+
         # Add our placeholders
         add_to_collection(GraphKeys.PLACEHOLDER, [self.input_users,
                                                   self.input_items,
+                                                  self.input_positive_items_popularity,
                                                   self.input_items_negative,
+                                                  self.input_negative_items_popularity,
                                                   self.input_neighborhoods,
                                                   self.input_neighborhood_lengths,
                                                   self.input_neighborhoods_negative,
