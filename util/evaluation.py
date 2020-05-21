@@ -198,7 +198,7 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
         hrs_medium.append(hr_medium)
         hrs_high.append(hr_high)
 
-    s += "Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_1, ..., neg_99])): " + str(test_loss)
+    s += "Avg Loss on Test Set (each loss value is computed on (user, pos, [neg_0, ..., neg_99])): " + str(test_loss)
     tf.logging.info(s + '\n')
 
     return hrs, \

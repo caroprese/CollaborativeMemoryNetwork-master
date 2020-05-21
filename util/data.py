@@ -221,7 +221,7 @@ class Dataset(object):
                 n = self._sample_item()
         else:
             # TODO LC > Dealing with popularity
-            select_most_popular_first = True  # True = current experiments
+            select_most_popular_first = False  # True = current experiments (LASCIARE False)
             selected_index = int(index / (upper_bound - 1) * len(more_popular_positive_items))
 
             if select_most_popular_first:

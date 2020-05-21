@@ -27,7 +27,7 @@ from keras import backend as K, optimizers, metrics
 
 # Parameters ------------------------------------
 baseline = False
-pinterest = False
+pinterest = True
 
 gpu = '1'
 limit = 500
