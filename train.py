@@ -32,10 +32,12 @@ pinterest = True
 gpu = '1'
 limit = 500
 
+low_popularity_threshold = 0.05
+high_popularity_threshold = 0.25
 
 use_popularity = not baseline  # True (!) False e' la baseline. [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
 load_pretrained_embeddings = True  # Load pretrained embeddings
-use_preprocess = not pinterest   # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
+use_preprocess = not pinterest  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
 
 if pinterest and not baseline:
     rebuild = True  # True for pinterest dataset when 3 positive items per user will be used, False for movielens dataset
@@ -161,8 +163,8 @@ set_parameters(
     loss_type=loss_type,
     k=k,
     k_trainable=k_trainable,
-    low_popularity_threshold=0.05,
-    high_popularity_threshold=0.25
+    low_popularity_threshold=low_popularity_threshold,
+    high_popularity_threshold=high_popularity_threshold
 )
 
 config.item_count = dataset.item_count
