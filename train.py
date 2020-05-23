@@ -25,17 +25,26 @@ from logging.config import dictConfig
 from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 
-# Parameters ------------------------------------
+# console_super_test_baseline.txt
+# console_final_our_proposal_2.txt
+
+# Base Parameters -------------------------------
 baseline = False
 pinterest = True
 
-gpu = '1'
-limit = 500
+gpu = '0'
+epochs = 1
+limit = None
+batch_size = 256
+users_per_batch = 100
 
-low_popularity_threshold = 0.05
-high_popularity_threshold = 0.25
+low_popularity_threshold = 0.024605678233438486
+high_popularity_threshold = 0.25173501577287066
+# -----------------------------------------------
 
+# Derived Parameters ----------------------------
 use_popularity = not baseline  # True (!) False e' la baseline. [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
+
 load_pretrained_embeddings = True  # Load pretrained embeddings
 use_preprocess = not pinterest  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
 
@@ -64,16 +73,18 @@ metrics_percentile = 0.45
 
 parser = argparse.ArgumentParser(parents=[get_optimizer_argparse()], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, required=True)
-parser.add_argument('--iters', help='Max iters', type=int, default=30)
+parser.add_argument('--iters', help='Max iters', type=int, default=epochs)
 # parser.add_argument('--iters', help='Max iters', type=int, default=3)
-parser.add_argument('-b', '--batch_size', help='Batch Size', type=int, default=256)
+parser.add_argument('-b', '--batch_size', help='Batch Size', type=int, default=batch_size)
 parser.add_argument('-e', '--embedding', help='Embedding Size', type=int, default=50)  # 50
 parser.add_argument('--dataset', help='path to file', type=str, required=True)
 parser.add_argument('--hops', help='Number of hops/layers', type=int, default=2)
+
 if baseline:
     parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=4)
 else:
     parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=2)  # (2)!
+
 parser.add_argument('--l2', help='l2 Regularization', type=float, default=0.1)
 parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory',
                     type=str, default=None)
@@ -258,10 +269,11 @@ for i in range(FLAGS.iters):
                                                                                                                                      model.dropout,
                                                                                                                                      model.score,
                                                                                                                                      config.max_neighbors,
-                                                                                                                                     model)
+                                                                                                                                     model,
+                                                                                                                                     users_per_batch=users_per_batch)
     results.append([np.mean(loss), test_loss, hrs[1], hrs_low[1], hrs_medium[1], hrs_high[1]])
     print('____________________________________________________________________')
-    print('RESULTS AT Epoch {} ({}):'.format(i, 'movielens' if use_preprocess else 'pinterest'))
+    print('RESULTS AT Epoch {} ({} - path: {}):'.format(i, 'movielens' if use_preprocess else 'pinterest', sv.save_path))
     print('Ep.\t\tLoss\t\t\tTest Loss\t\t\t\tHR@5\t\tHR_LOW@5\tHR_MED@5\tHR_HIGH@5')
     for row in range(len(results)):
         print(row,
@@ -288,7 +300,8 @@ scores, items, out, loss = get_model_scores(sess,
                                             model.score,
                                             config.max_neighbors,
                                             model,
-                                            True)
+                                            users_per_batch=users_per_batch,
+                                            return_scores=True)
 
 for k in EVAL_AT:
     hr, custom_hr, weighted_hr, ndcg, hits, normalized_hits, hr_low, hr_medium, hr_high, n_pop = get_eval(scores, items, len(scores[0]) - 1, k)

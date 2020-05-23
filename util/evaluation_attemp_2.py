@@ -5,82 +5,47 @@ from tqdm import tqdm
 import settings
 from settings import Settings, y_custom, sigmoid
 
-input_user_list = []
-input_item_list = []
-input_neighborhood_list = []
-input_neighborhood_lengths_list = []
-
-loss_input_user_list = []
-loss_input_item_list = []
-loss_input_items_negative_list = []
-
-loss_input_neighborhoods_list = []
-loss_input_neighborhood_lengths_list = []
-
-loss_input_neighborhoods_negative_list = []
-loss_input_neighborhood_lengths_negative_list = []
-
-loss_input_positive_items_popularity_list = []
-loss_input_negative_items_popularity_list = []
-
-
-def reset_lists():
-    global input_user_list
-    global input_item_list
-    global input_neighborhood_list
-    global input_neighborhood_lengths_list
-
-    global loss_input_user_list
-    global loss_input_item_list
-    global loss_input_items_negative_list
-
-    global loss_input_neighborhoods_list
-    global loss_input_neighborhood_lengths_list
-
-    global loss_input_neighborhoods_negative_list
-    global loss_input_neighborhood_lengths_negative_list
-
-    global loss_input_positive_items_popularity_list
-    global loss_input_negative_items_popularity_list
-
-    input_user_list = []
-    input_item_list = []
-    input_neighborhood_list = []
-    input_neighborhood_lengths_list = []
-
-    loss_input_user_list = []
-    loss_input_item_list = []
-    loss_input_items_negative_list = []
-
-    loss_input_neighborhoods_list = []
-    loss_input_neighborhood_lengths_list = []
-
-    loss_input_neighborhoods_negative_list = []
-    loss_input_neighborhood_lengths_negative_list = []
-
-    loss_input_positive_items_popularity_list = []
-    loss_input_negative_items_popularity_list = []
-
 
 def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_item_handle,
-                     input_neighborhood_handle, input_neighborhood_lengths_handle,
-                     dropout_handle, score_op, max_neighbors, model, users_per_batch=100, return_scores=False):
+                     input_neighborhood_handle,
+                     input_neighborhood_lengths_handle,
+                     dropout_handle, score_op, max_neighbors, model,
+
+                     return_scores=False):
     """
     test_data = dict([positive, np.array[negatives]])
     """
-    print('USERS PER BATCH:', users_per_batch)
+    print('////////////////\\\\\\\\\\\\\\\\', input_neighborhood_handle)
     out = ''
-    scores = []  # n x 101 (punteggi) dove n e' il numero di utenti. Cosa succede se voglio piu' oggetti per ogni utente?
+    scores = []  # n x 100 (punteggi) dove n e' il numero di utenti. Cosa succede se voglio piu' oggetti per ogni utente?
     items = []
     losses = []
     progress = tqdm(test_data.items(), total=len(test_data), leave=False, desc=u'Evaluate || ')
 
-    user_count = 0
-
-    number_of_evaluated_items = None
+    count = 0
 
     for user, (pos_list, neg) in progress:
+        feed = {
+            input_user_handle: [],
+            input_item_handle: [],
+            input_neighborhood_handle: [],
+            input_neighborhood_lengths_handle: []
+        }
 
+        feed_loss = {
+            input_user_handle: [],
+            input_item_handle: [],
+            model.input_items_negative: [],
+
+            model.input_neighborhoods: [],
+            model.input_neighborhood_lengths: [],
+
+            model.input_neighborhoods_negative: [],
+            model.input_neighborhood_lengths_negative: [],
+
+            model.input_positive_items_popularity: [],  # Added by LC
+            model.input_negative_items_popularity: [],  # Added by LC
+        }
         for pos in pos_list:
 
             if pos < 0:
@@ -91,10 +56,7 @@ def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_ite
             item_indices = list(neg) + [pos]
             # print('item_indices:',item_indices)
 
-            if number_of_evaluated_items is None:
-                number_of_evaluated_items = len(neg) + 1
-
-            # LC > loss computation:
+            # LC > compute loss:
             '''
             user: [u    u    u    ...u   ]
             pos : [p    p    p    ...p   ]
@@ -123,10 +85,12 @@ def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_ite
                     else:
                         neighborhoods[_idx, :1] = user
 
-                input_user_list.extend([user] * (len(neg) + 1))
-                input_item_list.extend(item_indices)
-                input_neighborhood_list.extend(neighborhoods.tolist())
-                input_neighborhood_lengths_list.extend(neighborhood_length)
+                feed = {
+                    input_user_handle: feed[input_user_handle] + ([user] * (len(neg) + 1)),
+                    input_item_handle: feed[input_item_handle] + item_indices,
+                    input_neighborhood_handle: feed[input_neighborhood_handle] + neighborhoods,
+                    input_neighborhood_lengths_handle: feed[input_neighborhood_lengths_handle] + neighborhood_length
+                }
 
                 # vicini degli oggetti [neg_1, ..., neg_100]
                 # 100 * max_neighbors
@@ -147,91 +111,35 @@ def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_ite
                     else:
                         neighborhoods_negative[_idx, :1] = user
 
-                loss_input_user_list.extend([user] * len(neg))
-                loss_input_item_list.extend([pos] * len(neg))
-                loss_input_items_negative_list.extend(list(neg))
+                feed_loss = {
+                    input_user_handle: feed_loss[input_user_handle] + ([user] * len(neg)),
+                    input_item_handle: feed_loss[input_item_handle] + [pos] * len(neg),
+                    model.input_items_negative: feed_loss[model.input_items_negative] + list(neg),
 
-                loss_input_neighborhoods_list.extend(neighborhoods_positive)
-                loss_input_neighborhood_lengths_list.extend(neighborhood_length_positive)
+                    model.input_neighborhoods: np.concatenate([feed_loss[model.input_neighborhoods], neighborhoods_positive]),
+                    model.input_neighborhood_lengths: np.concatenate([feed_loss[model.input_neighborhood_lengths], neighborhood_length_positive]),
 
-                loss_input_neighborhoods_negative_list.extend(neighborhoods_negative)
-                loss_input_neighborhood_lengths_negative_list.extend(neighborhood_length_negative)
+                    model.input_neighborhoods_negative: np.concatenate([feed_loss[model.input_neighborhoods_negative], neighborhoods_negative]),
+                    model.input_neighborhood_lengths_negative: np.concatenate([feed_loss[model.input_neighborhood_lengths_negative], neighborhoods_negative]),
 
-                loss_input_positive_items_popularity_list.extend(settings.Settings.normalized_popularity[[pos] * len(neg)])
-                loss_input_negative_items_popularity_list.extend(settings.Settings.normalized_popularity[list(neg)])
+                    model.input_positive_items_popularity: np.concatenate([feed_loss[model.input_positive_items_popularity], settings.Settings.normalized_popularity[[pos] * len(neg)]]),  # Added by LC
+                    model.input_negative_items_popularity: np.concatenate([feed_loss[model.input_negative_items_popularity], settings.Settings.normalized_popularity[list(neg)]]),  # Added by LC
+                }
 
-        user_count += 1
-        if user_count % users_per_batch == 0:
-            # print('\nUSER COUNT:', user_count)
+            count += 1
 
-            feed = {
-                input_user_handle: input_user_list,
-                input_item_handle: input_item_list,
-                input_neighborhood_handle: input_neighborhood_list,
-                input_neighborhood_lengths_handle: input_neighborhood_lengths_list
-            }
-
-            feed_loss = {
-                input_user_handle: loss_input_user_list,
-                input_item_handle: loss_input_item_list,
-                model.input_items_negative: loss_input_items_negative_list,
-
-                model.input_neighborhoods: loss_input_neighborhoods_list,
-                model.input_neighborhood_lengths: loss_input_neighborhood_lengths_list,
-
-                model.input_neighborhoods_negative: loss_input_neighborhoods_negative_list,
-                model.input_neighborhood_lengths_negative: loss_input_neighborhood_lengths_negative_list,
-
-                model.input_positive_items_popularity: loss_input_positive_items_popularity_list,  # Added by LC
-                model.input_negative_items_popularity: loss_input_negative_items_popularity_list,  # Added by LC
-            }
-
-            score, processed_items = sess.run([score_op, input_item_handle], feed)
-            scores.extend(score)
-            items.extend(processed_items)
-
-            loss = sess.run(model.loss, feed_loss)
-            losses.append(loss)
-
-            reset_lists()
-
-    if len(input_user_list) > 0:
-        feed = {
-            input_user_handle: input_user_list,
-            input_item_handle: input_item_list,
-            input_neighborhood_handle: input_neighborhood_list,
-            input_neighborhood_lengths_handle: input_neighborhood_lengths_list
-        }
-
-        feed_loss = {
-            input_user_handle: loss_input_user_list,
-            input_item_handle: loss_input_item_list,
-            model.input_items_negative: loss_input_items_negative_list,
-
-            model.input_neighborhoods: loss_input_neighborhoods_list,
-            model.input_neighborhood_lengths: loss_input_neighborhood_lengths_list,
-
-            model.input_neighborhoods_negative: loss_input_neighborhoods_negative_list,
-            model.input_neighborhood_lengths_negative: loss_input_neighborhood_lengths_negative_list,
-
-            model.input_positive_items_popularity: loss_input_positive_items_popularity_list,  # Added by LC
-            model.input_negative_items_popularity: loss_input_negative_items_popularity_list,  # Added by LC
-        }
-
-        score, processed_items = sess.run([score_op, input_item_handle], feed)
-        scores.extend(score)
-        items.extend(processed_items)
+        score = sess.run(score_op, feed)
+        # print('SCORE:', score)
+        scores.append(score.ravel())
+        items.append(item_indices)
+        if return_scores:
+            s = ' '.join(["{}:{}".format(n, s) for s, n in zip(score.ravel().tolist(), item_indices)])
+            out += "{}\t{}\n".format(user, s)
 
         loss = sess.run(model.loss, feed_loss)
         losses.append(loss)
 
-    scores = np.asarray(scores).reshape(-1, number_of_evaluated_items)
-    items = np.asarray(items).reshape(-1, number_of_evaluated_items)
-
-    if return_scores:
-        s = ' '.join(["{}:{}".format(n, s) for s, n in zip(score.ravel().tolist(), item_indices)])
-        out += "{}\t{}\n".format(user, s)
-        pass
+    # print('Number of processed tuples:', count)
 
     if return_scores:
         return scores, items, out, sum(losses) / len(losses)
@@ -242,13 +150,14 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
                    input_neighborhood_handle,
                    input_neighborhood_lengths_handle,
                    dropout_handle, score_op, max_neighbors, model,
-                   EVAL_AT=[1, 5, 10], users_per_batch=100):
-    # print('users_per_batch:',users_per_batch)
+                   EVAL_AT=[1, 5, 10]):
     scores, items, out, test_loss = get_model_scores(sess, test_data, neighborhood, input_user_handle, input_item_handle,
                                                      input_neighborhood_handle,
                                                      input_neighborhood_lengths_handle,
                                                      dropout_handle, score_op, max_neighbors, model,
-                                                     users_per_batch, return_scores=True)
+                                                     return_scores=True)
+    # print('out:', out)
+    # print('scores:', scores)
 
     '''
 
@@ -328,7 +237,6 @@ def get_eval(scores, items, index, top_n=10):
     """
     # print('>>>>>>>>>>>>>>>> scores:', scores)
     # print('>>>>>>>>>>>>>>>> items:', items)
-
     eps = 1e-15
 
     ndcg = 0.0
@@ -338,7 +246,7 @@ def get_eval(scores, items, index, top_n=10):
     hits = np.array([0, 0, 0])
 
     assert len(scores[0]) > index and index >= 0
-
+    # print(items)
     items_to_guess = np.array(items)[:, index]
     # print(items_to_guess.shape)
 
