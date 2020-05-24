@@ -37,11 +37,13 @@ epochs = 30
 limit = None
 batch_size = 256
 users_per_batch = 50
-neg_items = 3
+neg_items = 2
 
 use_popularity = True
-loss_type = 0
+loss_type = 2
 rebuild = True
+
+learning_rate = 0.001  # 0.0001
 
 low_popularity_threshold = 0.024605678233438486
 high_popularity_threshold = 0.25173501577287066
@@ -86,7 +88,7 @@ parser.add_argument('--pretrain', help='Load pretrained user/item embeddings', t
 if baseline:
     parser.set_defaults(optimizer='rmsprop', learning_rate=0.001, decay=0.9, momentum=0.9)  # 0.001 e' la baseline. Se learning_rate=0.0001 le cose vanno meglio con la nuova loss
 else:
-    parser.set_defaults(optimizer='rmsprop', learning_rate=0.0001, decay=0.9, momentum=0.9)
+    parser.set_defaults(optimizer='rmsprop', learning_rate=learning_rate, decay=0.9, momentum=0.9)
 
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)

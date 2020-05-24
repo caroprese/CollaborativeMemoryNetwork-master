@@ -230,9 +230,9 @@ class Dataset(object):
             '''
             # print(index)
             if index == 0:
-                selected_index = 0
-            else:
                 selected_index = len(more_popular_positive_items) - 1
+            else:
+                selected_index = 0
 
             n = more_popular_positive_items[selected_index]
 
