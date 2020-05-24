@@ -221,11 +221,18 @@ class Dataset(object):
                 n = self._sample_item()
         else:
             # TODO LC > Dealing with popularity
+            '''
             select_most_popular_first = False  # True = current experiments (LASCIARE False)
             selected_index = int(index / (upper_bound - 1) * len(more_popular_positive_items))
 
             if select_most_popular_first:
                 selected_index = len(more_popular_positive_items) - 1 - selected_index
+            '''
+            # print(index)
+            if index == 0:
+                selected_index = 0
+            else:
+                selected_index = len(more_popular_positive_items) - 1
 
             n = more_popular_positive_items[selected_index]
 
@@ -279,15 +286,13 @@ class Dataset(object):
         # Shuffle index
         np.random.shuffle(self._train_index)
 
-        assert neg_count % 2 == 0
-
         idx = 0
         for user_idx, item_idx in self.train_data[self._train_index]:
             # TODO: set positive values outside of for loop
             for i in range(neg_count):
                 # TODO > modified by Luciano Caroprese. Now a negative item of a user wrt a positive item is an item not explicitly positive or a positive item with an higher popularity
                 if use_popularity:
-                    if i % 2 == 1:
+                    if i % neg_count == (neg_count - 1):
                         # selecting a negative item
                         neg_item_idx = self._sample_negative_item(user_idx)
                     else:

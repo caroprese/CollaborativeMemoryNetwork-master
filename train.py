@@ -11,8 +11,6 @@ import os
 import argparse
 import random
 
-from tensorflow import set_random_seed
-
 import settings
 from settings import set_parameters, get_percentile
 from util.helper import get_optimizer_argparse, preprocess_args, create_exp_directory, BaseConfig, get_logging_config
@@ -24,39 +22,34 @@ import tensorflow as tf
 from logging.config import dictConfig
 from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
+from tensorflow import set_random_seed
 
-# console_super_test_baseline.txt
-# console_final_our_proposal_2.txt
+# result_new_loss_pop.txt - 33980
+# result_old_loss_pop.txt - 34362
+# result_baseline.txt - 10003
 
 # Base Parameters -------------------------------
 baseline = False
 pinterest = True
 
-gpu = '0'
-epochs = 1
+gpu = '1'
+epochs = 30
 limit = None
 batch_size = 256
-users_per_batch = 100
+users_per_batch = 50
+neg_items = 3
+
+use_popularity = True
+loss_type = 0
+rebuild = True
 
 low_popularity_threshold = 0.024605678233438486
 high_popularity_threshold = 0.25173501577287066
 # -----------------------------------------------
 
 # Derived Parameters ----------------------------
-use_popularity = not baseline  # True (!) False e' la baseline. [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
-
 load_pretrained_embeddings = True  # Load pretrained embeddings
 use_preprocess = not pinterest  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
-
-if pinterest and not baseline:
-    rebuild = True  # True for pinterest dataset when 3 positive items per user will be used, False for movielens dataset
-else:
-    rebuild = False
-
-if baseline:
-    loss_type = 0  # 2 (!) 0: old loss; 1: custom loss; 2: new loss
-else:
-    loss_type = 2
 
 k = 300  # a pameter for the new loss
 k_trainable = False
@@ -69,6 +62,12 @@ metrics_beta = 0.03
 metrics_gamma = 5
 metrics_scale = 1 / 15
 metrics_percentile = 0.45
+
+if baseline:
+    use_popularity = False  # [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
+    loss_type = 0
+    neg_items = 4
+    rebuild = False
 # -----------------------------------------------
 
 parser = argparse.ArgumentParser(parents=[get_optimizer_argparse()], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -79,15 +78,9 @@ parser.add_argument('-b', '--batch_size', help='Batch Size', type=int, default=b
 parser.add_argument('-e', '--embedding', help='Embedding Size', type=int, default=50)  # 50
 parser.add_argument('--dataset', help='path to file', type=str, required=True)
 parser.add_argument('--hops', help='Number of hops/layers', type=int, default=2)
-
-if baseline:
-    parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=4)
-else:
-    parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=2)  # (2)!
-
+parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=neg_items)
 parser.add_argument('--l2', help='l2 Regularization', type=float, default=0.1)
-parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory',
-                    type=str, default=None)
+parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory', type=str, default=None)
 parser.add_argument('--resume', help='Resume existing from logdir', action="store_true")
 parser.add_argument('--pretrain', help='Load pretrained user/item embeddings', type=str, required=True)
 if baseline:
