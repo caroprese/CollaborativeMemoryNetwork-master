@@ -47,8 +47,9 @@ class Dataset(object):
             # assert len(self.train_data) - b == len(self.test_data)
         else:
             # To avoid a weird error
-            for user in self.test_data:
-                self.test_data[user] = ([self.test_data[user][0]], self.test_data[user][1])
+            if not use_preprocess:
+                for user in self.test_data:
+                    self.test_data[user] = ([self.test_data[user][0]], self.test_data[user][1])
 
         self._n_users, self._n_items = self.train_data.max(axis=0) + 1
 
@@ -88,7 +89,7 @@ class Dataset(object):
         # print(list(self.test_data.keys())[:100])
         # ---------------------------------------------------------------------
 
-        if rebuild:
+        if rebuild and not use_preprocess:
             self.test_data = {}
             rows_to_delete = []
 
@@ -137,7 +138,6 @@ class Dataset(object):
                 '''
                 self.test_data[user] = ([less_popular_item, medium_popular_item, most_popular_item], self.negative_items[user])
 
-            '''
             rows_to_delete = np.array(rows_to_delete, dtype=np.uint32)
 
             a1_rows = self.train_data.view([('', self.train_data.dtype)] * self.train_data.shape[0 if self.train_data.flags['F_CONTIGUOUS'] else -1])
@@ -146,19 +146,10 @@ class Dataset(object):
             print('before:\n', self.train_data)
             self.train_data = np.setdiff1d(a1_rows, a2_rows).view(self.train_data.dtype).reshape(-1, self.train_data.shape[1])
             print('after:\n', self.train_data)
-            '''
-            rows_to_delete = np.array(rows_to_delete, dtype=np.uint32)
-
-            a1_rows = self.train_data.view([('', np.uint32)] * self.train_data.shape[0 if self.train_data.flags['F_CONTIGUOUS'] else -1])
-            a2_rows = rows_to_delete.view([('', np.uint32)] * rows_to_delete.shape[0 if rows_to_delete.flags['F_CONTIGUOUS'] else -1])  # 1
-
-            print('before:\n', self.train_data)
-            self.train_data = np.setdiff1d(a1_rows, a2_rows).view(np.uint32).reshape(-1, self.train_data.shape[1])
-            print('after:\n', self.train_data)
 
             # print('after:', self.train_data[self.train_data[:, 0] == 0])
 
-        print('TEST DATA:', self.test_data)
+        # print('TEST DATA:', self.test_data)
         self._train_index = np.arange(len(self.train_data), dtype=np.uint)
 
         # Neighborhoods

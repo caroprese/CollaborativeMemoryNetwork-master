@@ -35,14 +35,14 @@ def preprocess_dataset(filename='./data/dataset_movielens_pop_05_25.json'):
         negative_test_items = dataset_test[user][1]
         # print('Test Items:', test_items)
         for item in items:
-            if item not in positive_test_items:
-                train_data.append([user, item])
+            # if item not in positive_test_items:
+            train_data.append([user, item])
         test_data[user] = (positive_test_items, negative_test_items)
 
     # print(str(dataset)[:100])
     train_data = np.array(train_data)
 
-    print(train_data)
+    # print(train_data)
 
     return train_data, test_data
 

@@ -29,9 +29,9 @@ from tensorflow import set_random_seed
 
 # Base Parameters -------------------------------
 baseline = False
-pinterest = True
+pinterest = False
 
-gpu = '1'
+gpu = '2'
 epochs = 30
 limit = None
 batch_size = 256
@@ -39,14 +39,17 @@ users_per_batch = 50
 neg_items = 2
 
 use_popularity = True
-loss_type = 0  # baseline=0
+loss_type = 2  # baseline=0
 rebuild = True
 
 learning_rate = 0.00001  # 0.0001 baseline=0.001
 
-low_popularity_threshold = 0.024605678233438486
-high_popularity_threshold = 0.25173501577287066
-
+if pinterest:
+    low_popularity_threshold = 0.024605678233438486
+    high_popularity_threshold = 0.25173501577287066
+else:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
 
 # -----------------------------------------------
 
