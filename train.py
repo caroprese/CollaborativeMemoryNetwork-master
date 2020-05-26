@@ -24,9 +24,8 @@ from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
-# result_new_loss_pop.txt - 33980
-# result_old_loss_pop.txt - 34362
-# result_baseline.txt - 10003
+# report_baseline.txt - 17466
+# report_old_loss_P2.txt - 40413
 
 # Base Parameters -------------------------------
 baseline = False
@@ -40,13 +39,15 @@ users_per_batch = 50
 neg_items = 2
 
 use_popularity = True
-loss_type = 2
+loss_type = 0  # baseline=0
 rebuild = True
 
-learning_rate = 0.001  # 0.0001
+learning_rate = 0.00001  # 0.0001 baseline=0.001
 
 low_popularity_threshold = 0.024605678233438486
 high_popularity_threshold = 0.25173501577287066
+
+
 # -----------------------------------------------
 
 # Derived Parameters ----------------------------
@@ -65,11 +66,15 @@ metrics_gamma = 5
 metrics_scale = 1 / 15
 metrics_percentile = 0.45
 
+# BASELINE --------------------------------------
 if baseline:
     use_popularity = False  # [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
     loss_type = 0
     neg_items = 4
     rebuild = False
+    learning_rate = 0.001
+    batch_size = 256
+# -----------------------------------------------
 # -----------------------------------------------
 
 parser = argparse.ArgumentParser(parents=[get_optimizer_argparse()], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -85,10 +90,7 @@ parser.add_argument('--l2', help='l2 Regularization', type=float, default=0.1)
 parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory', type=str, default=None)
 parser.add_argument('--resume', help='Resume existing from logdir', action="store_true")
 parser.add_argument('--pretrain', help='Load pretrained user/item embeddings', type=str, required=True)
-if baseline:
-    parser.set_defaults(optimizer='rmsprop', learning_rate=0.001, decay=0.9, momentum=0.9)  # 0.001 e' la baseline. Se learning_rate=0.0001 le cose vanno meglio con la nuova loss
-else:
-    parser.set_defaults(optimizer='rmsprop', learning_rate=learning_rate, decay=0.9, momentum=0.9)
+parser.set_defaults(optimizer='rmsprop', learning_rate=learning_rate, decay=0.9, momentum=0.9)
 
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
@@ -254,6 +256,7 @@ for i in range(FLAGS.iters):
         progress.set_description(u"[{}] Loss (type={}, k={}): {:,.4f} » » » » ".format(i, settings.Settings.loss_type, parameter_k, batch_loss))
 
     tf.logging.info("Epoch {}: Avg Loss/Batch {:<20,.6f}".format(i, np.mean(loss)))
+
     hrs, custom_hrs, weighted_hrs, ndcgs, hits_list, normalized_hits_list, test_loss, hrs_low, hrs_medium, hrs_high = evaluate_model(sess,
                                                                                                                                      dataset.test_data,
                                                                                                                                      dataset.item_users_list,
@@ -267,19 +270,19 @@ for i in range(FLAGS.iters):
                                                                                                                                      model,
                                                                                                                                      users_per_batch=users_per_batch)
     results.append([np.mean(loss), test_loss, hrs[1], hrs_low[1], hrs_medium[1], hrs_high[1]])
-    print('____________________________________________________________________')
+    print('_________________________________________________________________________________________')
     print('RESULTS AT Epoch {} ({} - path: {}):'.format(i, 'movielens' if use_preprocess else 'pinterest', sv.save_path))
-    print('Ep.\t\tLoss\t\t\tTest Loss\t\t\t\tHR@5\t\tHR_LOW@5\tHR_MED@5\tHR_HIGH@5')
+    print('Ep.\t\tLoss\t\t\tTest Loss\t\t\tHR@5\t\tHR_LOW@5\tHR_MED@5\tHR_HIGH@5')
     for row in range(len(results)):
         print(row,
-              str(results[row][0]),
-              str(results[row][1]),
+              str(round(results[row][0], 10)),
+              str(round(results[row][1], 10)),
               str(round(results[row][2], 4)),
               str(round(results[row][3], 4)),
               str(round(results[row][4], 4)),
               str(round(results[row][5], 4)),
               sep='\t\t')
-    print('____________________________________________________________________')
+    print('_________________________________________________________________________________________')
 
 EVAL_AT = range(1, 11)
 hrs, custom_hrs, weighted_hrs, ndcgs, hits_list, normalized_hits_list = [], [], [], [], [], []
