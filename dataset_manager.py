@@ -40,7 +40,7 @@ def preprocess_dataset(filename='./data/dataset_movielens_pop_05_25.json'):
         test_data[user] = (positive_test_items, negative_test_items)
 
     # print(str(dataset)[:100])
-    train_data = np.array(train_data)
+    train_data = np.array(train_data,dtype=np.uint32)
 
     # print(train_data)
 

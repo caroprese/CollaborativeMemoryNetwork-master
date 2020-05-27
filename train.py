@@ -24,26 +24,32 @@ from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
-# report_baseline.txt - 17466
-# report_old_loss_P2.txt - 40413
+# report_baseline_new_test_set.txt 30614
+# report_movielens_our_proposal.txt - 34422
 
 # Base Parameters -------------------------------
-baseline = False
+resume = False
+logdir = None  # 'result/962/'
+
+baseline = False  # baseline parameters will be forced
 pinterest = False
 
-gpu = '2'
-epochs = 30
+gpu = '1'
+epochs = 12
 limit = None
 batch_size = 256
 users_per_batch = 50
-neg_items = 2
 
-use_popularity = True
-loss_type = 2  # baseline=0
-rebuild = True
+rebuild = True  # if True, the test set will contain 3 positive items per user
 
-learning_rate = 0.00001  # 0.0001 baseline=0.001
+neg_items = 4  # baseline=4 (our setting=2)
+use_popularity = False  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
 
+loss_type = 0  # baseline=0
+learning_rate = 0.001  # baseline=0.001 (our setting=0.00001)
+# -----------------------------------------------
+
+# Derived Parameters ----------------------------
 if pinterest:
     low_popularity_threshold = 0.024605678233438486
     high_popularity_threshold = 0.25173501577287066
@@ -51,13 +57,10 @@ else:
     low_popularity_threshold = 0.05
     high_popularity_threshold = 0.25
 
-# -----------------------------------------------
-
-# Derived Parameters ----------------------------
 load_pretrained_embeddings = True  # Load pretrained embeddings
 use_preprocess = not pinterest  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
 
-k = 300  # a pameter for the new loss
+k = 300  # a parameter for the new loss
 k_trainable = False
 
 loss_alpha = 200
@@ -90,10 +93,10 @@ parser.add_argument('--dataset', help='path to file', type=str, required=True)
 parser.add_argument('--hops', help='Number of hops/layers', type=int, default=2)
 parser.add_argument('-n', '--neg', help='Negative Samples Count', type=int, default=neg_items)
 parser.add_argument('--l2', help='l2 Regularization', type=float, default=0.1)
-parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory', type=str, default=None)
-parser.add_argument('--resume', help='Resume existing from logdir', action="store_true")
 parser.add_argument('--pretrain', help='Load pretrained user/item embeddings', type=str, required=True)
 parser.set_defaults(optimizer='rmsprop', learning_rate=learning_rate, decay=0.9, momentum=0.9)
+parser.add_argument('-l', '--logdir', help='Set custom name for logdirectory', type=str, default=None)
+parser.add_argument('--resume', help='Resume existing from logdir', action="store_true")
 
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
@@ -101,6 +104,8 @@ preprocess_args(FLAGS)
 if use_preprocess:
     FLAGS.pretrain = 'pretrain/movielens_e50.npz'
 FLAGS.gpu = gpu
+FLAGS.resume = resume
+FLAGS.logdir = logdir
 
 os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
 
@@ -150,6 +155,9 @@ class Config(BaseConfig):
 
 config = Config()
 
+print('FLAGS.resume:', FLAGS.resume)
+print('config.logdir:', config.logdir)
+
 if FLAGS.resume:
     config.save_directory = config.logdir
     config.load()
@@ -185,11 +193,13 @@ config.max_neighbors = dataset._max_user_neighbors
 tf.logging.info("\n\n%s\n\n" % config)
 
 if not FLAGS.resume:
-    config.save()
+    # config.save()
+    pass
 
 print('CMN Config:', config)
 model = CollaborativeMemoryNetwork(config)
 
+exit(-1)
 sv = tf.train.Supervisor(logdir=config.logdir, save_model_secs=60 * 10,
                          save_summaries_secs=0)
 
@@ -211,12 +221,14 @@ else:
 # Train Loop
 results = []
 for i in range(FLAGS.iters):
+    print('LC>>>', i)
     if sv.should_stop():
         break
 
     progress = tqdm(enumerate(dataset.get_data(FLAGS.batch_size, True, FLAGS.neg, use_popularity=use_popularity)),
                     dynamic_ncols=True, total=(dataset.train_size * FLAGS.neg) // FLAGS.batch_size)
     loss = []
+
     for k, example in progress:
         ratings, pos_neighborhoods, pos_neighborhood_length, neg_neighborhoods, neg_neighborhood_length = example
         feed = {

@@ -1,0 +1,22 @@
+MOVIELENS, BASELINE
+# Base Parameters -------------------------------
+resume = False
+logdir = None  # 'result/962/'
+
+baseline = False  # baseline parameters will be forced
+pinterest = False
+
+gpu = '1'
+epochs = 12
+limit = None
+batch_size = 256
+users_per_batch = 50
+
+rebuild = True  # if True, the test set will contain 3 positive items per user
+
+neg_items = 4  # baseline=4 (our setting=2)
+use_popularity = False  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
+
+loss_type = 0  # baseline=0
+learning_rate = 0.001  # baseline=0.001 (our setting=0.00001)
+# -----------------------------------------------

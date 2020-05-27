@@ -30,19 +30,40 @@ parser.add_argument('-o', '--output', help='save filename for trained embeddings
 
 FLAGS = parser.parse_args()
 
-# Parameters ------------------------------------
-# Hardcoded FLAGS
-FLAGS.gpu = '1'
+# Base Parameters -------------------------------
 FLAGS.output = 'pretrain/movielens_e50.npz'
 
-limit = 500
-use_popularity = False  # [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
-train_embeddings = False  # Do not load pretrained embeddings
-use_preprocess = True  # If yes the movielens dataset will be used and preprocessed (from a json archive)
-rebuild = False  # True for pinteres dataset when 3 positive items per user will be used
+baseline = False
+pinterest = False
 
-loss_type = 2  # 0: old loss; 1: custom loss; 2: new loss
+gpu = '2'
+epochs = 30
+limit = None
+batch_size = 256
+users_per_batch = 50
+neg_items = 2
+
+use_popularity = True
+loss_type = 0  # baseline=0
+rebuild = True
+
+learning_rate = 0.00001  # 0.0001 baseline=0.001
+
+if pinterest:
+    low_popularity_threshold = 0.024605678233438486
+    high_popularity_threshold = 0.25173501577287066
+else:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
+
+# -----------------------------------------------
+
+# Derived Parameters ----------------------------
+load_pretrained_embeddings = True  # Load pretrained embeddings
+use_preprocess = not pinterest  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
+
 k = 300  # a pameter for the new loss
+k_trainable = False
 
 loss_alpha = 200
 loss_beta = 0.02
@@ -52,6 +73,16 @@ metrics_beta = 0.03
 metrics_gamma = 5
 metrics_scale = 1 / 15
 metrics_percentile = 0.45
+
+# BASELINE --------------------------------------
+if baseline:
+    use_popularity = False  # [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
+    loss_type = 0
+    neg_items = 4
+    rebuild = False
+    learning_rate = 0.001
+    batch_size = 256
+# -----------------------------------------------
 # -----------------------------------------------
 
 os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
@@ -88,8 +119,12 @@ set_parameters(
     metrics_scale=metrics_scale,
     metrics_percentile=metrics_percentile,
     loss_type=loss_type,
-    k=k
+    k=k,
+    k_trainable=k_trainable,
+    low_popularity_threshold=low_popularity_threshold,
+    high_popularity_threshold=high_popularity_threshold
 )
+
 # -----------------------------------------------------------------------------
 
 config.item_count = dataset.item_count

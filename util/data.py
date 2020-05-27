@@ -27,7 +27,7 @@ class Dataset(object):
             self.train_data = self._data['train_data'][:, :2]
             self.test_data = self._data['test_data'].tolist()
 
-        # print(self.train_data)
+        # print(str(self.train_data[:50, :]))
         # print(self.test_data)
 
         # Shallow copy
@@ -137,8 +137,10 @@ class Dataset(object):
                 '''
                 self.test_data[user] = ([less_popular_item, medium_popular_item, most_popular_item], self.negative_items[user])
 
-            '''
             rows_to_delete = np.array(rows_to_delete, dtype=np.uint32)
+
+            # print('self.train_data.dtype:', self.train_data.dtype)
+            # print('rows_to_delete.dtype:', rows_to_delete.dtype)
 
             a1_rows = self.train_data.view([('', self.train_data.dtype)] * self.train_data.shape[0 if self.train_data.flags['F_CONTIGUOUS'] else -1])
             a2_rows = rows_to_delete.view([('', rows_to_delete.dtype)] * rows_to_delete.shape[0 if rows_to_delete.flags['F_CONTIGUOUS'] else -1])  # 1
@@ -146,6 +148,7 @@ class Dataset(object):
             print('before:\n', self.train_data)
             self.train_data = np.setdiff1d(a1_rows, a2_rows).view(self.train_data.dtype).reshape(-1, self.train_data.shape[1])
             print('after:\n', self.train_data)
+
             '''
             rows_to_delete = np.array(rows_to_delete, dtype=np.uint32)
 
@@ -155,10 +158,11 @@ class Dataset(object):
             print('before:\n', self.train_data)
             self.train_data = np.setdiff1d(a1_rows, a2_rows).view(np.uint32).reshape(-1, self.train_data.shape[1])
             print('after:\n', self.train_data)
+            '''
 
             # print('after:', self.train_data[self.train_data[:, 0] == 0])
 
-        print('TEST DATA:', self.test_data)
+        # print('TEST DATA:', self.test_data)
         self._train_index = np.arange(len(self.train_data), dtype=np.uint)
 
         # Neighborhoods

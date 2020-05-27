@@ -336,6 +336,11 @@ class ModelBase(object):
             self._set_dropout_op = self.dropout.assign(self._dropout_update)
 
         # Set the learning rate for the optimizer parameters as our variable
+        print(type(self.learning_rate))
+        print(self.learning_rate)
+
+        #print(self.config.optimizer_params['learning_rate'])
+        #print(type(self.config.optimizer_params['learning_rate']))
         self.config.optimizer_params['learning_rate'] = self.learning_rate
 
     def decay_learning_rate(self, session, learning_rate_decay):

@@ -1,0 +1,41 @@
+CMN Config: {
+  "batch_size": 256,
+  "decay_rate": 0.9,
+  "embed_size": 50,
+  "filename": "data/pinterest.npz",
+  "grad_clip": 5.0,
+  "hops": 2,
+  "item_count": "9916",
+  "l2": 0.1,
+  "learning_rate": 1e-05,
+  "logdir": "result/962/",
+  "max_neighbors": 669,
+  "neg_count": 2,
+  "optimizer": "rmsprop",
+  "optimizer_params": "{'momentum': 0.9, 'decay': 0.9}",
+  "pretrain": "pretrain/pinterest_e50.npz",
+  "save_directory": "result/962/",
+  "tol": 1e-05,
+  "user_count": "55187"
+}
+
+CMN Config: {
+  "batch_size": 256,
+  "decay_rate": 0.9,
+  "embed_size": 50,
+  "filename": "data/pinterest.npz",
+  "grad_clip": 5.0,
+  "hops": 2,
+  "item_count": "9916",
+  "l2": 0.1,
+  "learning_rate": 1e-05,
+  "logdir": "result/962/",
+  "max_neighbors": 669,
+  "neg_count": 2,
+  "optimizer": "rmsprop",
+  "optimizer_params": "{'momentum': 0.9, 'decay': 0.9}",
+  "pretrain": "pretrain/pinterest_e50.npz",
+  "save_directory": "result/962/",
+  "tol": 1e-05,
+  "user_count": "55187"
+}
