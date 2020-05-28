@@ -28,7 +28,7 @@ from tensorflow import set_random_seed
 
 # report_baseline_new_test_set.txt - 30614 - 0
 # report_pinterest_our_proposal.txt - 26248 - 2
-# report_citeulike_our_proposal.txt - 31853 -1
+# report_citeulike_baseline.txt - 36565 -1
 
 # -----------------------------------------------
 
@@ -43,20 +43,19 @@ resume = False
 logdir = None
 
 baseline = False  # baseline parameters will be forced
-pinterest = True
 
 gpu = '1'
 epochs = 12
 limit = None
 users_per_batch = 50
 
-rebuild = True  # if True, the test set will contain 3 positive items per user
+rebuild = False  # if True, the test set will contain 3 positive items per user
 
-neg_items = 2  # baseline=4 (our setting=2)
-use_popularity = True  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
+neg_items = 4  # baseline=4 (our setting=2)
+use_popularity = False  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
 
-loss_type = 2  # baseline=0
-learning_rate = 0.00001  # baseline=0.001 (our setting=0.00001)
+loss_type = 0  # baseline=0
+learning_rate = 0.001  # baseline=0.001 (our setting=0.00001)
 # -----------------------------------------------
 
 # Derived Parameters ----------------------------
@@ -251,7 +250,6 @@ else:
 # Train Loop
 results = []
 for i in range(FLAGS.iters):
-    print('LC>>>', i)
     if sv.should_stop():
         break
 
