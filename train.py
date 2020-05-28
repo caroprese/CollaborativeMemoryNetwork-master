@@ -24,41 +24,56 @@ from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
-# report_baseline_new_test_set.txt 30614
-# report_movielens_our_proposal.txt - 34422
+# report_baseline_new_test_set.txt 30614 - 0
+# report_pinterest_our_proposal.txt - 26248 - 2
+# report_citeulike_our_proposal.txt - 31853 -1
+
+PINTEREST = 'pinterest'
+MOVIELENS = 'movielens'
+CITEULIKE = 'citeulike'
 
 # Base Parameters -------------------------------
+dataset = CITEULIKE
+
 resume = False
-logdir = None  # 'result/962/'
+logdir = None
 
 baseline = False  # baseline parameters will be forced
-pinterest = False
+pinterest = True
 
 gpu = '1'
 epochs = 12
 limit = None
-batch_size = 256
 users_per_batch = 50
 
 rebuild = True  # if True, the test set will contain 3 positive items per user
 
-neg_items = 4  # baseline=4 (our setting=2)
-use_popularity = False  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
+neg_items = 2  # baseline=4 (our setting=2)
+use_popularity = True  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
 
-loss_type = 0  # baseline=0
-learning_rate = 0.001  # baseline=0.001 (our setting=0.00001)
+loss_type = 2  # baseline=0
+learning_rate = 0.00001  # baseline=0.001 (our setting=0.00001)
 # -----------------------------------------------
 
 # Derived Parameters ----------------------------
-if pinterest:
+if dataset == PINTEREST:
     low_popularity_threshold = 0.024605678233438486
     high_popularity_threshold = 0.25173501577287066
+    batch_size = 256
+elif dataset == MOVIELENS:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
+    batch_size = 256
+elif dataset == CITEULIKE:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
+    batch_size = 128
 else:
     low_popularity_threshold = 0.05
     high_popularity_threshold = 0.25
 
 load_pretrained_embeddings = True  # Load pretrained embeddings
-use_preprocess = not pinterest  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
+use_preprocess = dataset == MOVIELENS  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
 
 k = 300  # a parameter for the new loss
 k_trainable = False
@@ -101,8 +116,19 @@ parser.add_argument('--resume', help='Resume existing from logdir', action="stor
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
 
-if use_preprocess:
+if dataset == PINTEREST:
+    FLAGS.dataset = 'data/pinterest.npz'
+    FLAGS.pretrain = 'pretrain/pinterest_e50.npz'
+
+elif dataset == MOVIELENS:
+    FLAGS.dataset = None
     FLAGS.pretrain = 'pretrain/movielens_e50.npz'
+elif dataset == CITEULIKE:
+    FLAGS.dataset = 'data/citeulike-a.npz'
+    FLAGS.pretrain = 'pretrain/citeulike-a_e50.npz'
+else:
+    FLAGS.pretrain = None
+
 FLAGS.gpu = gpu
 FLAGS.resume = resume
 FLAGS.logdir = logdir
@@ -155,8 +181,8 @@ class Config(BaseConfig):
 
 config = Config()
 
-print('FLAGS.resume:', FLAGS.resume)
-print('config.logdir:', config.logdir)
+# print('FLAGS.resume:', FLAGS.resume)
+# print('config.logdir:', config.logdir)
 
 if FLAGS.resume:
     config.save_directory = config.logdir
@@ -193,13 +219,13 @@ config.max_neighbors = dataset._max_user_neighbors
 tf.logging.info("\n\n%s\n\n" % config)
 
 if not FLAGS.resume:
-    # config.save()
+    config.save()
     pass
 
 print('CMN Config:', config)
 model = CollaborativeMemoryNetwork(config)
 
-exit(-1)
+# exit(-1)
 sv = tf.train.Supervisor(logdir=config.logdir, save_model_secs=60 * 10,
                          save_summaries_secs=0)
 
@@ -286,7 +312,7 @@ for i in range(FLAGS.iters):
                                                                                                                                      users_per_batch=users_per_batch)
     results.append([np.mean(loss), test_loss, hrs[1], hrs_low[1], hrs_medium[1], hrs_high[1]])
     print('_________________________________________________________________________________________')
-    print('RESULTS AT Epoch {} ({} - path: {}):'.format(i, 'movielens' if use_preprocess else 'pinterest', sv.save_path))
+    print('RESULTS AT Epoch {} ({} - path: {}):'.format(i, dataset, sv.save_path))
     print('Ep.\t\tLoss\t\t\tTest Loss\t\t\tHR@5\t\tHR_LOW@5\tHR_MED@5\tHR_HIGH@5')
     for row in range(len(results)):
         print(row,

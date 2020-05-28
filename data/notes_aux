@@ -1,41 +1,31 @@
-CMN Config: {
-  "batch_size": 256,
-  "decay_rate": 0.9,
-  "embed_size": 50,
-  "filename": "data/pinterest.npz",
-  "grad_clip": 5.0,
-  "hops": 2,
-  "item_count": "9916",
-  "l2": 0.1,
-  "learning_rate": 1e-05,
-  "logdir": "result/962/",
-  "max_neighbors": 669,
-  "neg_count": 2,
-  "optimizer": "rmsprop",
-  "optimizer_params": "{'momentum': 0.9, 'decay': 0.9}",
-  "pretrain": "pretrain/pinterest_e50.npz",
-  "save_directory": "result/962/",
-  "tol": 1e-05,
-  "user_count": "55187"
-}
-
-CMN Config: {
-  "batch_size": 256,
-  "decay_rate": 0.9,
-  "embed_size": 50,
-  "filename": "data/pinterest.npz",
-  "grad_clip": 5.0,
-  "hops": 2,
-  "item_count": "9916",
-  "l2": 0.1,
-  "learning_rate": 1e-05,
-  "logdir": "result/962/",
-  "max_neighbors": 669,
-  "neg_count": 2,
-  "optimizer": "rmsprop",
-  "optimizer_params": "{'momentum': 0.9, 'decay': 0.9}",
-  "pretrain": "pretrain/pinterest_e50.npz",
-  "save_directory": "result/962/",
-  "tol": 1e-05,
-  "user_count": "55187"
-}
+Model
+Razer Blade 15 - Advanced Model OS
+Windows 10 Home
+ Processor
+10th Gen Intel® Core™ i7-10875H 8-Core (2.3GHz / 5.1GHz)
+ Graphics
+NVIDIA® GeForce RTX™ 2080 SUPER™ with Max-Q Design (8GB GDDR6 VRAM)
+ Display
+15.6" Full HD 300Hz, 100% sRGB, 4.9mm bezel, factory calibrated
+ Storage
+1TB SSD (M.2 NVMe PCIe 3.0 x4)
+ Memory
+16GB Dual-Channel (8GB x 2) DDR4-2933MHz
+ Battery
+80Wh
+ Keyboard
+Per-key RGB powered by Razer Chroma™
+ Gigabit Ethernet
+Not available
+ USB & Thunderbolt 3
+USB 3.2 Gen 2 (USB-A) x2, USB-C 3.2 Gen 2, Thunderbolt™ 3 (USB-C)
+ Wireless
+Intel® Wireless-AX201 (802.11a/b/g/n/ac/ax) + Bluetooth® 5
+ Webcam
+Windows® Hello built-in IR HD webcam (1MP / 720P)
+ Finish
+Black with backlit green logo and green USB ports
+ Dimensions
+0.70" x 9.25" x 13.98" / 17.8mm x 235mm x 355mm
+ Weight
+4.7 - 4.9 lbs / 2.14 - 2.2 kg
