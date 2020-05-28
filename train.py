@@ -24,9 +24,13 @@ from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
-# report_baseline_new_test_set.txt 30614 - 0
+# CURRENT EXECUTIONS ----------------------------
+
+# report_baseline_new_test_set.txt - 30614 - 0
 # report_pinterest_our_proposal.txt - 26248 - 2
 # report_citeulike_our_proposal.txt - 31853 -1
+
+# -----------------------------------------------
 
 PINTEREST = 'pinterest'
 MOVIELENS = 'movielens'
