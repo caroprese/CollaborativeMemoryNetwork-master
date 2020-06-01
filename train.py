@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-'''
+''' 
 @author:   Travis A. Ebesu
 @created:  2017-03-30
 @summary:
@@ -37,7 +37,7 @@ NETFLIX_SAMPLE = 'netflix_sample'
 PINTEREST = 'pinterest'
 
 # Base Parameters -------------------------------
-dataset = EPINIONS
+dataset = MOVIELENS_1M
 baseline = False  # baseline parameters will be forced
 
 gpu = '0'
@@ -101,7 +101,7 @@ parser.add_argument('--resume', help='Resume existing from logdir', action="stor
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
 
-FLAGS.dataset = 'data/preprocess/' + dataset + '/pg/'
+FLAGS.dataset = 'data/preprocess/' + dataset + '/'
 FLAGS.pretrain = 'pretrain/' + dataset + '.npz'
 FLAGS.gpu = gpu
 FLAGS.resume = resume
@@ -164,8 +164,7 @@ if FLAGS.resume:
 
 dictConfig(get_logging_config(config.logdir))
 
-dataset = Dataset(config.filename,
-                  limit=limit)
+dataset = Dataset(config.filename, limit=limit)
 set_parameters(
     normalized_popularity=dataset.normalized_popularity,
     loss_alpha=loss_alpha,
@@ -227,6 +226,7 @@ for i in range(FLAGS.iters):
 
     progress = tqdm(enumerate(dataset.get_data(FLAGS.batch_size, True, FLAGS.neg, use_popularity=use_popularity)),
                     dynamic_ncols=True, total=(dataset.train_size * FLAGS.neg) // FLAGS.batch_size)
+
     loss = []
 
     for k, example in progress:

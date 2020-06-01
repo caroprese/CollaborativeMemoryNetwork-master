@@ -13,79 +13,27 @@ class Dataset(object):
         """
 
         # Training Set
-        with open(path + 'data.pickle', 'rb') as f:
-            data = pickle.load(f)
+        with open(path + 'train.pickle', 'rb') as f:
+            train_data_dict = pickle.load(f)
 
-        print(data.keys)
-        normalized_popularity_dict = data['popularity']
-
-        self._n_users = data['users']
-        self._n_items = max(normalized_popularity_dict) + 1
-
-        print('self._n_users:', self._n_users)
-        print('self._n_items:', self._n_items)
-
-        # Normalized Popularity -----------------------------------------------
-        self.normalized_popularity = (np.zeros(self._n_items))
-        for i in range(self._n_items):
-            self.normalized_popularity[i] = normalized_popularity_dict[i]
-        # ---------------------------------------------------------------------
-
-        self.thresholds = data['thresholds']
-
-        for k in data.keys():
-            print(k)
-
-        normalized_popularity_dict = data['popularity']
-        self.thresholds = data['thresholds']
+        normalized_popularity_dict = train_data_dict['popularity']
+        self.thresholds = train_data_dict['thresholds']
 
         print('self.thresholds:', self.thresholds)
-        prefs = data['prefs']
+        prefs = train_data_dict['prefs']
 
+        # print(prefs)
+        # exit(-1)
         self.train_data = []
-        self.user_positive_items = {}
-
         for user in prefs:
-            # print('user:', user)
-            # print(prefs[user])
-            user_dict = prefs[user]
-
-            self.user_positive_items[user] = []
-
-            for user_key in prefs[user]:
-                # print(user_key)
-                # print(user_dict[user_key])
-                self.user_positive_items[user].extend(user_dict[user_key])
-                if user_key == 'train' or user_key == 'vad_tr' or user_key == 'test_tr':
-                    # print(user_key)
-                    positive_items = user_dict[user_key]
-                    # print(positive_items)
-                    for item in positive_items:
-                        self.train_data.append([user, item])
-
-            # print(self.user_positive_items[user])
-
-        # print(self.train_data)
-        # campionare fra gli oggetti negativi non contenuti negli oggetti positivi degli utenti.
-
-        self.test_data = {}
-
-        for user in prefs:
-            # print('user:', user)
-            # print(prefs[user])
-            user_dict = prefs[user]
-
-            for user_key in prefs[user]:
-                # print(user_key)
-                # print(user_dict[user_key])
-                if user_key == 'test_te':
-                    negative_items = self.sample_negative_items(user, 100)
-                    assert len(set(negative_items).intersection(self.user_positive_items[user])) == 0
-                    self.test_data[user] = (user_dict[user_key], negative_items)
-
-        # print(self.test_data)
+            for item in prefs[user][0]:
+                self.train_data.append([user, item, prefs[user][1]])
 
         # Test Set
+        with open(path + 'test_te.pickle', 'rb') as f:
+            test_data_dict = pickle.load(f)
+
+        self.test_data = test_data_dict['prefs']
 
         '''
         self.negative_items = {}
@@ -93,19 +41,33 @@ class Dataset(object):
             self.negative_items[user] = self.test_data[user][1]
         '''
 
+        self._n_users = train_data_dict['users']
+        self._n_items = max(normalized_popularity_dict) + 1
+
+        print('self._n_users:', self._n_users)
+        print('self._n_items:', self._n_items)
+
         self.user_items = defaultdict(set)
         self.item_users = defaultdict(set)
-        for u, i in self.train_data:
+        for u, i, _ in self.train_data:
             self.user_items[u].add(i)
             self.item_users[i].add(u)
+
+        # LC > (Normalized) Popularity ----------------------------------------
+        self.normalized_popularity = (np.zeros(self._n_items))
+
+        for i in range(self._n_items):
+            self.normalized_popularity[i] = normalized_popularity_dict[i]
+        # ---------------------------------------------------------------------
 
         # LC > Implementing limit ---------------------------------------------
         if limit is None:
             limit = self._n_users
-            self.train_data = [element for element in self.train_data if element[0] < limit]
 
-        self.train_data = np.array(self.train_data, dtype=np.uint32)
-        # self.test_data = {key: self.test_data[key] for key in range(limit)}
+        print(str(self.test_data)[:300])
+        print(self.test_data[35048])
+        self.train_data = [element for element in self.train_data if element[0] < limit]
+        self.test_data = {key: self.test_data[key] for key in range(limit)}
 
         # print(self.train_data)
         # print(self.test_data)
@@ -116,24 +78,14 @@ class Dataset(object):
         # print(len(self.test_data.keys()))
         # print(list(self.test_data.keys())[:100])
         # ---------------------------------------------------------------------
-        # print('SHAPE:',self.train_data.shape)
-        self._train_index = np.arange(len(self.train_data), dtype=np.uint32)
-        # self._train_index = np.arange(limit, dtype=np.uint)
+
+        self._train_index = np.arange(len(self.train_data), dtype=np.uint)
 
         # Get a list version so we do not need to perform type casting
         self.item_users_list = {k: list(v) for k, v in self.item_users.items()}
         self._max_user_neighbors = max([len(x) for x in self.item_users.values()])
         self.user_items = dict(self.user_items)
         self.item_users = dict(self.item_users)
-
-    def sample_negative_items(self, user, n):
-        items = []
-        for i in range(n):
-            item = self._sample_item()
-            while item is items or item in self.user_positive_items[user]:
-                item = self._sample_item()
-            items.append(item)
-        return items
 
     @property
     def train_size(self):
@@ -257,9 +209,7 @@ class Dataset(object):
         np.random.shuffle(self._train_index)
 
         idx = 0
-        print('\n', self._train_index)
         for user_idx, item_idx in self.train_data[self._train_index]:
-            # for user_idx, item_idx in self.train_data:
             # TODO: set positive values outside of for loop
             for i in range(neg_count):
                 # TODO > modified by Luciano Caroprese. Now a negative item of a user wrt a positive item is an item not explicitly positive or a positive item with an higher popularity
