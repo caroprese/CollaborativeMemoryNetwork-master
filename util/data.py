@@ -16,7 +16,6 @@ class Dataset(object):
         with open(path + 'data.pickle', 'rb') as f:
             data = pickle.load(f)
 
-        print(data.keys)
         normalized_popularity_dict = data['popularity']
 
         self._n_users = data['users']
@@ -32,29 +31,17 @@ class Dataset(object):
         # ---------------------------------------------------------------------
 
         self.thresholds = data['thresholds']
-
-        for k in data.keys():
-            print(k)
-
-        normalized_popularity_dict = data['popularity']
-        self.thresholds = data['thresholds']
-
-        print('self.thresholds:', self.thresholds)
         prefs = data['prefs']
 
         self.train_data = []
         self.user_positive_items = {}
 
         for user in prefs:
-            # print('user:', user)
-            # print(prefs[user])
             user_dict = prefs[user]
 
             self.user_positive_items[user] = []
 
             for user_key in prefs[user]:
-                # print(user_key)
-                # print(user_dict[user_key])
                 self.user_positive_items[user].extend(user_dict[user_key])
                 if user_key == 'train' or user_key == 'vad_tr' or user_key == 'test_tr':
                     # print(user_key)
@@ -63,35 +50,20 @@ class Dataset(object):
                     for item in positive_items:
                         self.train_data.append([user, item])
 
-            # print(self.user_positive_items[user])
-
-        # print(self.train_data)
         # campionare fra gli oggetti negativi non contenuti negli oggetti positivi degli utenti.
 
         self.test_data = {}
 
         for user in prefs:
-            # print('user:', user)
-            # print(prefs[user])
             user_dict = prefs[user]
 
             for user_key in prefs[user]:
-                # print(user_key)
-                # print(user_dict[user_key])
                 if user_key == 'test_te':
                     negative_items = self.sample_negative_items(user, 100)
                     assert len(set(negative_items).intersection(self.user_positive_items[user])) == 0
                     self.test_data[user] = (user_dict[user_key], negative_items)
 
         # print(self.test_data)
-
-        # Test Set
-
-        '''
-        self.negative_items = {}
-        for user in self.test_data:
-            self.negative_items[user] = self.test_data[user][1]
-        '''
 
         self.user_items = defaultdict(set)
         self.item_users = defaultdict(set)
@@ -105,20 +77,8 @@ class Dataset(object):
             self.train_data = [element for element in self.train_data if element[0] < limit]
 
         self.train_data = np.array(self.train_data, dtype=np.uint32)
-        # self.test_data = {key: self.test_data[key] for key in range(limit)}
 
-        # print(self.train_data)
-        # print(self.test_data)
-
-        # print(self.train_data[0:10,:])
-        # print('TEST SET: ------------------------------------------------------')
-        # print(type(self.test_data))
-        # print(len(self.test_data.keys()))
-        # print(list(self.test_data.keys())[:100])
-        # ---------------------------------------------------------------------
-        # print('SHAPE:',self.train_data.shape)
         self._train_index = np.arange(len(self.train_data), dtype=np.uint32)
-        # self._train_index = np.arange(limit, dtype=np.uint)
 
         # Get a list version so we do not need to perform type casting
         self.item_users_list = {k: list(v) for k, v in self.item_users.items()}
@@ -168,10 +128,11 @@ class Dataset(object):
         Uniformly sample a negative item
         """
         if user_id > self.user_count:
-            raise ValueError("Trying to sample user id: {} > user count: {}".format(
-                user_id, self.user_count))
+            raise ValueError("Trying to sample user id: {} > user count: {}".format(user_id, self.user_count))
 
-        positive_items = self.user_items[user_id]
+        # positive_items = self.user_items[user_id]
+        positive_items = self.user_positive_items[user_id]
+
         more_popular_positive_items = set()
         if item is not None:
             # objects more popular than 'item'
@@ -185,8 +146,8 @@ class Dataset(object):
             n = self._sample_item()
 
             if len(positive_items) >= self.item_count:
-                raise ValueError("The User has rated more items than possible %s / %s" % (
-                    len(positive_items), self.item_count))
+                raise ValueError("The User has rated more items than possible %s / %s" % (len(positive_items), self.item_count))
+
             while n in positive_items or n not in self.item_users:
                 n = self._sample_item()
         else:
