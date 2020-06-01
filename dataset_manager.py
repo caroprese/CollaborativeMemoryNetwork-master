@@ -3,46 +3,44 @@ import random
 import pandas as pd
 import json
 import numpy as np
-
-seed = 42
-random.seed(seed)
+import pickle
 
 
-def preprocess_dataset(filename='./data/dataset_movielens_pop_05_25.json'):
-    with open(filename) as json_file:
-        data = json.load(json_file)
+def preprocess_dataset(path='./data/preprocess/ml-1m/pg/'):
+    with open(path + 'train.pickle', 'rb') as f:
+        train_data_source = pickle.load(f)
+    # print(data)
 
-    n_users = data['n_users']
-    n_items = data['n_items']
+    users = train_data_source['users']
+    popularity = train_data_source['popularity']
+    print(popularity)
+    exit(0)
+    thresholds = train_data_source['thresholds']
+    train_data_dict = train_data_source['prefs']
+    items = max(popularity)
 
-    print('n_users:', n_users)
-    print('n_items:', n_items)
-
-    ds = data['dataset']
-    dataset_test = data['dataset_test']
-
-    # print('ds.len:', len(ds))
-    # print(str(dataset_test)[:1000])
-
-    # print(type(ds))
-    # print(ds)
+    # print(users)
+    # print(items)
+    # print(thresholds)
+    # print(prefs)
     train_data = []
-    test_data = {}
-    for user in range(len(ds)):
-        items = ds[user]
-        # print(items)
-        positive_test_items = dataset_test[user][0]
-        negative_test_items = dataset_test[user][1]
-        # print('Test Items:', test_items)
-        for item in items:
-            # if item not in positive_test_items:
-            train_data.append([user, item])
-        test_data[user] = (positive_test_items, negative_test_items)
+    for user in train_data_dict:
+        # print('pos,neg:', train_data_dict[user])
 
-    # print(str(dataset)[:100])
-    train_data = np.array(train_data,dtype=np.uint32)
+        # print('pos', train_data_dict[user][0])
+        for item in train_data_dict[user][0]:
+            # print('[{},{}]'.format(user, item))
+            train_data.append([user, item, train_data_dict[user][1]])
 
-    # print(train_data)
+    # print(popularity)
+
+    with open(path + 'test_te.pickle', 'rb') as f:
+        test_data_source = pickle.load(f)
+
+    test_data = test_data_source['prefs']
+
+    print(train_data)
+    #print(test_data)
 
     return train_data, test_data
 

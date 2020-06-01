@@ -1,77 +1,74 @@
 import numpy as np
 from collections import defaultdict
 
-import settings
 from dataset_manager import preprocess_dataset
-import pickle
 
 
 class Dataset(object):
     count = 0
 
-    def __init__(self, path, limit=None):
+    def __init__(self, filename, limit=None, rebuild=False, use_preprocess=False):
         """
         Wraps dataset and produces batches for the model to consume
-        :param path: path to training data for npz file
+
+        :param filename: path to training data for npz file
         """
 
-        # Training Set
-        with open(path + 'train.pickle', 'rb') as f:
-            train_data_dict = pickle.load(f)
+        # Se rebuild=False i dataset (train e test) sono identici a prima
+        # Ora pero' il dataset di test e' copiato in un nuovo dataset (validation)
+        # Se rebuild=True sono alterati i dataset di training e di test.
 
-        normalized_popularity_dict = train_data_dict['popularity']
-        self.thresholds = train_data_dict['thresholds']
+        if use_preprocess:
+            self.train_data, self.test_data = preprocess_dataset()
+        else:
+            self._data = np.load(filename)
+            # print(str(self._data)[:200])
 
-        print('self.thresholds:', self.thresholds)
-        prefs = train_data_dict['prefs']
+            self.train_data = self._data['train_data'][:, :2]
+            self.test_data = self._data['test_data'].tolist()
 
-        self.train_data = []
-        for user in prefs:
-            for item in prefs[user][0]:
-                self.train_data.append([user, item, prefs[user][1]])
+        # print(str(self.train_data[:50, :]))
+        # print(self.test_data)
 
-        # Test Set
-        with open(path + 'test_te.pickle', 'rb') as f:
-            test_data_dict = pickle.load(f)
+        # Shallow copy
+        self.validation_data = self.test_data.copy()
 
-        self.test_data = test_data_dict['prefs']
+        if rebuild:
+            # LC > Rebuilding datasets
+            # b = len(self.train_data)
+            self.negative_items = {}
+            for user in self.test_data:
+                # self.train_data = np.insert(self.train_data, 0, np.array((user, self.test_data[user][0])), 0)
+                self.negative_items[user] = self.test_data[user][1]
+                pass
+            # print(str(self.negative_items))
 
-        '''
-        self.negative_items = {}
-        for user in self.test_data:
-            self.negative_items[user] = self.test_data[user][1]
-        '''
+            # print('GAP:', (len(self.train_data) - b))
+            # assert len(self.train_data) - b == len(self.test_data)
+        else:
+            # To avoid a weird error
+            for user in self.test_data:
+                self.test_data[user] = ([self.test_data[user][0]], self.test_data[user][1])
 
-        self._n_users = train_data_dict['users']
-        self._n_items = max(normalized_popularity_dict)
+        self._n_users, self._n_items = self.train_data.max(axis=0) + 1
 
-        print('self._n_users:', self._n_users)
-        print('self._n_items:', self._n_items)
-
+        # LC > (Normalized) Popularity ----------------------------------------
         self.user_items = defaultdict(set)
         self.item_users = defaultdict(set)
         for u, i in self.train_data:
             self.user_items[u].add(i)
             self.item_users[i].add(u)
 
-        # LC > (Normalized) Popularity ----------------------------------------
-        self.normalized_popularity = (np.zeros(self._n_items))
         self.popularity = np.zeros(self._n_items)
-
         for i in self.item_users:
             self.popularity[i] = len(self.item_users[i])
-            self.normalized_popularity[i] = normalized_popularity_dict[i]
+            # print('LC > popularity of item n.', i, ':', len(self.item_users[i]))
 
         min_value = np.min(self.popularity)
         max_value = np.max(self.popularity)
         gap = max_value - min_value
 
-        self.computed_normalized_popularity = (self.popularity - min_value) / gap
-
-        # Check!
-        for i in self.item_users:
-            if self.computed_normalized_popularity[i] != self.normalized_popularity[i]:
-                print('Wrong popularity for item {}. Computed: {}; Provided: {}'.format(i, self.computed_normalized_popularity[i], self.normalized_popularity[i]))
+        self.normalized_popularity = (self.popularity - min_value) / gap
         # ---------------------------------------------------------------------
 
         # LC > Implementing limit ---------------------------------------------
@@ -91,7 +88,89 @@ class Dataset(object):
         # print(list(self.test_data.keys())[:100])
         # ---------------------------------------------------------------------
 
+        if rebuild:
+            self.test_data = {}
+            rows_to_delete = []
+
+            for user in range(limit):
+                if user % 1000 == 0:
+                    print('Processing user {}'.format(user))
+
+                items = np.array(list(self.user_items[user]), dtype=np.int32)
+                items_popularity = self.normalized_popularity[items]
+                sorted_items = items[np.argsort(items_popularity)]
+
+                '''
+                print('Items for user {}:'.format(user), items)
+                print('Items popularity:'.format(user), items_popularity)
+                print('Sorted items:'.format(user), sorted_items)
+                '''
+
+                try:
+                    less_popular_item = sorted_items[0]
+                    medium_popular_item = sorted_items[round(len(sorted_items) / 2) - 1]
+                    most_popular_item = sorted_items[-1]
+                except:
+                    print('Items for user {}:'.format(user), items)
+                    print('Items popularity:'.format(user), items_popularity)
+                    print('Sorted items:'.format(user), sorted_items)
+                    pass
+
+                '''
+                print('Less popular object:', less_popular_item)
+                print('Medium popular object:', medium_popular_item)
+                print('Most popular object:', most_popular_item)
+                '''
+
+                rows_to_delete.append([user, less_popular_item])
+                rows_to_delete.append([user, medium_popular_item])
+                rows_to_delete.append([user, most_popular_item])
+
+                '''
+                # Updating training set
+                for item in (less_popular_item, medium_popular_item, most_popular_item):
+                    for i in range(self.train_data.shape[0]):
+                        if np.array_equal(self.train_data[i], np.array([user, item])):
+                            print('deleting {} from training set'.format(self.train_data[i]))
+                            self.train_data = np.delete(self.train_data, i, 0)
+                            break
+                '''
+                self.test_data[user] = ([less_popular_item, medium_popular_item, most_popular_item], self.negative_items[user])
+
+            rows_to_delete = np.array(rows_to_delete, dtype=np.uint32)
+
+            # print('self.train_data.dtype:', self.train_data.dtype)
+            # print('rows_to_delete.dtype:', rows_to_delete.dtype)
+
+            a1_rows = self.train_data.view([('', self.train_data.dtype)] * self.train_data.shape[0 if self.train_data.flags['F_CONTIGUOUS'] else -1])
+            a2_rows = rows_to_delete.view([('', rows_to_delete.dtype)] * rows_to_delete.shape[0 if rows_to_delete.flags['F_CONTIGUOUS'] else -1])  # 1
+
+            print('before:\n', self.train_data)
+            self.train_data = np.setdiff1d(a1_rows, a2_rows).view(self.train_data.dtype).reshape(-1, self.train_data.shape[1])
+            print('after:\n', self.train_data)
+
+            '''
+            rows_to_delete = np.array(rows_to_delete, dtype=np.uint32)
+
+            a1_rows = self.train_data.view([('', np.uint32)] * self.train_data.shape[0 if self.train_data.flags['F_CONTIGUOUS'] else -1])
+            a2_rows = rows_to_delete.view([('', np.uint32)] * rows_to_delete.shape[0 if rows_to_delete.flags['F_CONTIGUOUS'] else -1])  # 1
+
+            print('before:\n', self.train_data)
+            self.train_data = np.setdiff1d(a1_rows, a2_rows).view(np.uint32).reshape(-1, self.train_data.shape[1])
+            print('after:\n', self.train_data)
+            '''
+
+            # print('after:', self.train_data[self.train_data[:, 0] == 0])
+
+        # print('TEST DATA:', self.test_data)
         self._train_index = np.arange(len(self.train_data), dtype=np.uint)
+
+        # Neighborhoods
+        self.user_items = defaultdict(set)
+        self.item_users = defaultdict(set)
+        for u, i in self.train_data:
+            self.user_items[u].add(i)
+            self.item_users[i].add(u)
 
         # Get a list version so we do not need to perform type casting
         self.item_users_list = {k: list(v) for k, v in self.item_users.items()}

@@ -24,44 +24,59 @@ from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
-# CURRENT RUNS ----------------------------------
+# CURRENT EXECUTIONS ----------------------------
+
+# report_baseline_new_test_set.txt - 30614 - 0
+# report_pinterest_our_proposal.txt - 26248 - 2
+# report_citeulike_baseline.txt - 36565 -1
 
 # -----------------------------------------------
 
-CITEULIKE = 'citeulike-a'
-EPINIONS = 'epinions'
-MOVIELENS_1M = 'ml-1m'
-MOVIELENS_20M = 'ml-20m'
-NETFLIX = 'netflix'
-NETFLIX_SAMPLE = 'netflix_sample'
 PINTEREST = 'pinterest'
+MOVIELENS = 'movielens'
+CITEULIKE = 'citeulike'
 
 # Base Parameters -------------------------------
-dataset = EPINIONS
+dataset = CITEULIKE
+
+resume = False
+logdir = None
+
 baseline = False  # baseline parameters will be forced
 
-gpu = '0'
+gpu = '1'
 epochs = 12
 limit = None
 users_per_batch = 50
 
-neg_items = 2  # baseline=4 (our setting=2)
-use_popularity = True  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
+rebuild = False  # if True, the test set will contain 3 positive items per user
+
+neg_items = 4  # baseline=4 (our setting=2)
+use_popularity = False  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
 
 loss_type = 0  # baseline=0
-learning_rate = 0.00001  # baseline=0.001 (our setting=0.00001)
-
-load_pretrained_embeddings = True
+learning_rate = 0.001  # baseline=0.001 (our setting=0.00001)
 # -----------------------------------------------
 
 # Derived Parameters ----------------------------
-resume = False
-logdir = None
-
 if dataset == PINTEREST:
+    low_popularity_threshold = 0.024605678233438486
+    high_popularity_threshold = 0.25173501577287066
     batch_size = 256
-else:
+elif dataset == MOVIELENS:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
+    batch_size = 256
+elif dataset == CITEULIKE:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
     batch_size = 128
+else:
+    low_popularity_threshold = 0.05
+    high_popularity_threshold = 0.25
+
+load_pretrained_embeddings = True  # Load pretrained embeddings
+use_preprocess = dataset == MOVIELENS  # "movielens" if True (the dataset will be used and preprocessed (from a json archive))
 
 k = 300  # a parameter for the new loss
 k_trainable = False
@@ -80,13 +95,16 @@ if baseline:
     use_popularity = False  # [Evaluation phase] If use_popularity==True, a negative item N wrt a positive item P, can be a positive item with a lower popularity than P
     loss_type = 0
     neg_items = 4
+    rebuild = False
     learning_rate = 0.001
+    batch_size = 256
 # -----------------------------------------------
 # -----------------------------------------------
 
 parser = argparse.ArgumentParser(parents=[get_optimizer_argparse()], formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, required=True)
 parser.add_argument('--iters', help='Max iters', type=int, default=epochs)
+# parser.add_argument('--iters', help='Max iters', type=int, default=3)
 parser.add_argument('-b', '--batch_size', help='Batch Size', type=int, default=batch_size)
 parser.add_argument('-e', '--embedding', help='Embedding Size', type=int, default=50)  # 50
 parser.add_argument('--dataset', help='path to file', type=str, required=True)
@@ -101,8 +119,19 @@ parser.add_argument('--resume', help='Resume existing from logdir', action="stor
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
 
-FLAGS.dataset = 'data/preprocess/' + dataset + '/pg/'
-FLAGS.pretrain = 'pretrain/' + dataset + '.npz'
+if dataset == PINTEREST:
+    FLAGS.dataset = 'data/pinterest.npz'
+    FLAGS.pretrain = 'pretrain/pinterest_e50.npz'
+
+elif dataset == MOVIELENS:
+    FLAGS.dataset = None
+    FLAGS.pretrain = 'pretrain/movielens_e50.npz'
+elif dataset == CITEULIKE:
+    FLAGS.dataset = 'data/citeulike-a.npz'
+    FLAGS.pretrain = 'pretrain/citeulike-a_e50.npz'
+else:
+    FLAGS.pretrain = None
+
 FLAGS.gpu = gpu
 FLAGS.resume = resume
 FLAGS.logdir = logdir
@@ -165,7 +194,9 @@ if FLAGS.resume:
 dictConfig(get_logging_config(config.logdir))
 
 dataset = Dataset(config.filename,
-                  limit=limit)
+                  limit=limit,
+                  rebuild=rebuild,
+                  use_preprocess=use_preprocess)
 set_parameters(
     normalized_popularity=dataset.normalized_popularity,
     loss_alpha=loss_alpha,
@@ -180,8 +211,8 @@ set_parameters(
     loss_type=loss_type,
     k=k,
     k_trainable=k_trainable,
-    low_popularity_threshold=dataset.thresholds[0],
-    high_popularity_threshold=dataset.thresholds[1]
+    low_popularity_threshold=low_popularity_threshold,
+    high_popularity_threshold=high_popularity_threshold
 )
 
 config.item_count = dataset.item_count
@@ -203,19 +234,16 @@ sv = tf.train.Supervisor(logdir=config.logdir, save_model_secs=60 * 10,
 
 sess = sv.prepare_or_wait_for_session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
 
-if load_pretrained_embeddings:
-    try:
-        pretrain = np.load(FLAGS.pretrain)
+print('FLAGS.resume:', FLAGS.resume)
+if not FLAGS.resume and load_pretrained_embeddings:
+    pretrain = np.load(FLAGS.pretrain)
 
-        sess.graph._unsafe_unfinalize()
-        tf.logging.info('Loading Pretrained Embeddings.... from %s' % FLAGS.pretrain)
-        sess.run([
-            model.user_memory.embeddings.assign(pretrain['user'] * 0.5),
-            model.item_memory.embeddings.assign(pretrain['item'] * 0.5)
-        ])
-    except:
-        print('Embeddings not found!')
-        sess.graph._unsafe_unfinalize()
+    sess.graph._unsafe_unfinalize()
+    tf.logging.info('Loading Pretrained Embeddings.... from %s' % FLAGS.pretrain)
+    sess.run([
+        model.user_memory.embeddings.assign(pretrain['user'] * 0.5),
+        model.item_memory.embeddings.assign(pretrain['item'] * 0.5)
+    ])
 else:
     sess.graph._unsafe_unfinalize()
 
