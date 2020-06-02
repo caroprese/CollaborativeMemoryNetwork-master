@@ -42,14 +42,14 @@ class PairwiseGMF(ModelBase):
         """
 
         self.v = DenseLayer(1, False, tf.nn.relu, initializers=self._initializers,
-                                            regularizers=self._regularizers, name='OutputVector')
+                            regularizers=self._regularizers, name='OutputVector')
         self.score = tf.squeeze(self.v(self._cur_user * self._cur_item))
         self.negative_output = tf.squeeze(self.v(self._cur_user * self._cur_item_negative))
         tf.add_to_collection(GraphKeys.PREDICTION, self.score)
 
         parameter_k = None
         if settings.Settings.loss_type == 2:
-            self.k = tf.Variable(settings.Settings.k, trainable=True, dtype=tf.float32, name='k')
+            self.k = tf.Variable(settings.Settings.k, trainable=settings.Settings.k_trainable, dtype=tf.float32, name='k')
             parameter_k = self.k
 
         self.loss = LossLayer()(self.score,

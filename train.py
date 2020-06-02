@@ -10,22 +10,23 @@
 import os
 import argparse
 import random
-
+import numpy as np
+import tensorflow as tf
 import settings
+
 from settings import set_parameters, get_percentile
 from util.helper import get_optimizer_argparse, preprocess_args, create_exp_directory, BaseConfig, get_logging_config
 from util.data import Dataset
 from util.evaluation import evaluate_model, get_eval, get_model_scores
 from util.cmn import CollaborativeMemoryNetwork
-import numpy as np
-import tensorflow as tf
 from logging.config import dictConfig
 from tqdm import tqdm
 from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
 # CURRENT RUNS ----------------------------------
-
+# report_movielens_m1_bs.txt - 29714 - gpu 0
+# report_movielens_m1_op.txt - 29865 - gpu 1
 # -----------------------------------------------
 
 CITEULIKE = 'citeulike-a'
@@ -37,18 +38,18 @@ NETFLIX_SAMPLE = 'netflix_sample'
 PINTEREST = 'pinterest'
 
 # Base Parameters -------------------------------
-dataset = MOVIELENS_1M
+dataset = EPINIONS
 baseline = False  # baseline parameters will be forced
 
-gpu = '0'
-epochs = 12
+gpu = '1'
+epochs = 15
 limit = None
-users_per_batch = 50
+users_per_batch = 5
 
 neg_items = 2  # baseline=4 (our setting=2)
 use_popularity = True  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
 
-loss_type = 0  # baseline=0
+loss_type = 2  # baseline=0
 learning_rate = 0.00001  # baseline=0.001 (our setting=0.00001)
 
 load_pretrained_embeddings = True
@@ -102,7 +103,7 @@ FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
 
 FLAGS.dataset = 'data/preprocess/' + dataset + '/'
-FLAGS.pretrain = 'pretrain/' + dataset + '.npz'
+FLAGS.pretrain = 'pretrain/' + dataset + '_loss_' + str(loss_type) + '.npz'
 FLAGS.gpu = gpu
 FLAGS.resume = resume
 FLAGS.logdir = logdir
@@ -212,6 +213,7 @@ if load_pretrained_embeddings:
             model.user_memory.embeddings.assign(pretrain['user'] * 0.5),
             model.item_memory.embeddings.assign(pretrain['item'] * 0.5)
         ])
+        print('Embeddings loaded!')
     except:
         print('Embeddings not found!')
         sess.graph._unsafe_unfinalize()
