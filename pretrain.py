@@ -24,11 +24,15 @@ NETFLIX_SAMPLE = 'netflix_sample'
 PINTEREST = 'pinterest'
 NETFLIX = 'netflix'
 
-datasets_to_pretrain = [EPINIONS, CITEULIKE, MOVIELENS_20M, NETFLIX_SAMPLE, PINTEREST, NETFLIX]
-types = [True, False]
+datasets_to_pretrain = [MOVIELENS_1M]
+types = [True]
 
 # Base Parameters -------------------------------
 for d in datasets_to_pretrain:
+
+    tf.reset_default_graph()
+    tf.Graph().as_default()
+
     for baseline in types:
         print('PRETRAINING ----------------------------------------------------')
         print(d)

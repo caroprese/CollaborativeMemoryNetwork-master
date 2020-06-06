@@ -72,12 +72,10 @@ class Dataset(object):
             self.item_users[i].add(u)
 
         # LC > Implementing limit ---------------------------------------------
-        if limit is None:
-            limit = self._n_users
+        if limit is not None:
             self.train_data = [element for element in self.train_data if element[0] < limit]
 
         self.train_data = np.array(self.train_data, dtype=np.uint32)
-
         self._train_index = np.arange(len(self.train_data), dtype=np.uint32)
 
         # Get a list version so we do not need to perform type casting
@@ -138,8 +136,9 @@ class Dataset(object):
             # objects more popular than 'item'
             more_popular_positive_items = np.array(list(filter(lambda x: self.normalized_popularity[x] > self.normalized_popularity[item], positive_items)), dtype=np.uint32)
 
-            # ordering more_popular_positive_items by popularity (DESC)
+            # ordering more_popular_positive_items by popularity (ASC)
             more_popular_positive_items_popularity = self.normalized_popularity[more_popular_positive_items]
+
             more_popular_positive_items = more_popular_positive_items[np.argsort(more_popular_positive_items_popularity)]
 
         if item is None or len(more_popular_positive_items) == 0:
@@ -160,24 +159,33 @@ class Dataset(object):
                 selected_index = len(more_popular_positive_items) - 1 - selected_index
             '''
             # print(index)
+            # index va da 1 ad upper_bound-1 a passi di 2...
+            # esempio upper_bound=4 -> index -> 1,3
+            # calcolo selected index.
+            # index
+            selected_index = int((index - 1) / upper_bound * len(more_popular_positive_items))
+            '''
             if index == 1:  # 0 more, 1 less
                 selected_index = len(more_popular_positive_items) - 1
             else:
                 selected_index = 0
-
+            '''
             n = more_popular_positive_items[selected_index]
 
             verbose = False
             if verbose:
                 print('---------------------------------------')
-                print('index:', index)
-                print('upper_bound:', upper_bound)
                 print('item:', item)
-                print('positive_items:', positive_items)
-                print('more_popular_positive_items:', more_popular_positive_items)
-                print('np.sort(more_popular_positive_items_popularity)):', np.sort(more_popular_positive_items_popularity))
-                print('selected_index:', selected_index)
-                print('selected item (n):', n)
+                print('\nindex:', index)
+                print('upper_bound:', upper_bound)
+                print('\npositive_items:', positive_items)
+                print('self.normalized_popularity[positive_items]:', self.normalized_popularity[positive_items])
+                print('\nmore_popular_positive_items:', more_popular_positive_items)
+                print('self.normalized_popularity[more_popular_positive_items]:', self.normalized_popularity[more_popular_positive_items])
+                print('\nselected_index:', selected_index)
+                print('\nselected item (n):', n)
+                print('Item popularity:', self.normalized_popularity[item])
+                print('Selected Item popularity:', self.normalized_popularity[n])
                 print('---------------------------------------')
 
         return n
@@ -224,8 +232,18 @@ class Dataset(object):
             # TODO: set positive values outside of for loop
             for i in range(neg_count):
                 # TODO > modified by Luciano Caroprese. Now a negative item of a user wrt a positive item is an item not explicitly positive or a positive item with an higher popularity
+
                 if use_popularity:
+                    '''
                     if i % neg_count == (neg_count - 1):
+                        # selecting a negative item
+                        neg_item_idx = self._sample_negative_item(user_idx)
+                    else:
+                        # selecting a positive but more popular item (if there is one)
+                        neg_item_idx = self._sample_negative_item(user_idx, item_idx, i, neg_count)
+                        
+                    '''
+                    if i % 2 == 0:
                         # selecting a negative item
                         neg_item_idx = self._sample_negative_item(user_idx)
                     else:

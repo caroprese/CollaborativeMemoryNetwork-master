@@ -49,7 +49,12 @@ def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popu
         else:
             # g = 1 / (positive_items_popularity + 0.001)
             # k = 10000
-            g = k / (positive_items_popularity + 1)
+
+            # CURRENT
+            # g = k / (positive_items_popularity + 1)
+
+            # g = 1/((positive_items_popularity + eps)*(1-negative_items_popularity+eps))
+
             # g = k / (positive_items_popularity + eps)
             # g = k * (negative_items_popularity + 1) / (positive_items_popularity + 1)
             # g = (1 - positive_items_popularity)
@@ -80,18 +85,29 @@ def _bpr_loss(positive, negative, positive_items_popularity, negative_items_popu
             # loss = -k * positive_items_popularity * tf.math.log_sigmoid(difference)
 
             # loss = -tf.math.log_sigmoid(g*difference)+tf.log(k+1)
+
+            # LOSS 2
+            # loss = -tf.math.log_sigmoid(g * difference)
+
+            g = (k-1) * (1 - positive_items_popularity) + 1
             loss = -tf.math.log_sigmoid(g * difference)
 
             # tf.math.log_sigmoid
             # loss = -tf.log(tf.nn.sigmoid(difference) + eps) - tf.log(tf.nn.sigmoid(g) + eps)
             # loss = -tf.pow(1 - tf.nn.sigmoid(g * difference + eps), 3) * tf.math.log_sigmoid(g * difference + eps)
             # loss = -k * tf.math.log_sigmoid(positive * positive_items_popularity - negative)
+            # loss = -tf.math.log_sigmoid(positive * positive_items_popularity - negative * negative_items_popularity)
+
+            # loss = -tf.math.log_sigmoid(positive / (positive_items_popularity + eps) - negative / (1 - positive_items_popularity))
+
             # loss = -k * tf.math.log_sigmoid(positive - negative)*(positive_items_popularity)
             # loss = -k * tf.math.log_sigmoid((positive - negative))/positive_items_popularity
             # loss = -tf.math.log_sigmoid(g * (positive - negative))
+
             # FOCAL LOSS:
             # loss = -k * tf.pow(1 - tf.nn.sigmoid(difference), 3) * tf.math.log_sigmoid(difference)
 
+            # loss = -tf.pow(1 - tf.nn.sigmoid(difference), k) * tf.math.log_sigmoid(difference)
             # loss = -tf.log(tf.nn.sigmoid((tf.pow(positive, 1 / positive_items_popularity) - negative)) + eps)
             # loss = tf.nn.sigmoid(negative_items_popularity - positive_items_popularity) * (-tf.log(tf.nn.sigmoid((positive - negative)) + eps))
             # loss = -tf.log(tf.nn.sigmoid( (positive/positive_items_popularity - negative)) + eps)
@@ -339,8 +355,8 @@ class ModelBase(object):
         print(type(self.learning_rate))
         print(self.learning_rate)
 
-        #print(self.config.optimizer_params['learning_rate'])
-        #print(type(self.config.optimizer_params['learning_rate']))
+        # print(self.config.optimizer_params['learning_rate'])
+        # print(type(self.config.optimizer_params['learning_rate']))
         self.config.optimizer_params['learning_rate'] = self.learning_rate
 
     def decay_learning_rate(self, session, learning_rate_decay):

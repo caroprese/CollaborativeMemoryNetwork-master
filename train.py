@@ -1,7 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-''' 
+'''
 @author:   Travis A. Ebesu
 @created:  2017-03-30
 @summary:
@@ -25,8 +22,8 @@ from keras import backend as K, optimizers, metrics
 from tensorflow import set_random_seed
 
 # CURRENT RUNS ----------------------------------
-# report_movielens_m1_bs.txt - 29714 - gpu 0
-# report_movielens_m1_op.txt - 29865 - gpu 1
+# report_movielens_pos_neg.txt
+# report_movielens_one_more_test
 # -----------------------------------------------
 
 CITEULIKE = 'citeulike-a'
@@ -38,7 +35,7 @@ NETFLIX_SAMPLE = 'netflix_sample'
 PINTEREST = 'pinterest'
 
 # Base Parameters -------------------------------
-dataset = EPINIONS
+dataset_str = MOVIELENS_1M
 baseline = False  # baseline parameters will be forced
 
 gpu = '1'
@@ -46,11 +43,14 @@ epochs = 15
 limit = None
 users_per_batch = 5
 
-neg_items = 2  # baseline=4 (our setting=2)
+neg_items = 4   # baseline=4 (our setting=2)
 use_popularity = True  # if True, the training set contains samples of the form [user, pos, pos'], where pos' is a positive item for u more popular than pos
 
 loss_type = 2  # baseline=0
 learning_rate = 0.00001  # baseline=0.001 (our setting=0.00001)
+
+k = 10000  # a parameter for the new loss
+k_trainable = False
 
 load_pretrained_embeddings = True
 # -----------------------------------------------
@@ -59,13 +59,10 @@ load_pretrained_embeddings = True
 resume = False
 logdir = None
 
-if dataset == PINTEREST:
+if dataset_str == PINTEREST:
     batch_size = 256
 else:
-    batch_size = 128
-
-k = 300  # a parameter for the new loss
-k_trainable = False
+    batch_size = 256
 
 loss_alpha = 200
 loss_beta = 0.02
@@ -102,8 +99,8 @@ parser.add_argument('--resume', help='Resume existing from logdir', action="stor
 FLAGS = parser.parse_args()
 preprocess_args(FLAGS)
 
-FLAGS.dataset = 'data/preprocess/' + dataset + '/'
-FLAGS.pretrain = 'pretrain/' + dataset + '_loss_' + str(loss_type) + '.npz'
+FLAGS.dataset = 'data/preprocess/' + dataset_str + '/'
+FLAGS.pretrain = 'pretrain/' + dataset_str + '_loss_' + str(loss_type) + '.npz'
 FLAGS.gpu = gpu
 FLAGS.resume = resume
 FLAGS.logdir = logdir
@@ -233,6 +230,10 @@ for i in range(FLAGS.iters):
 
     for k, example in progress:
         ratings, pos_neighborhoods, pos_neighborhood_length, neg_neighborhoods, neg_neighborhood_length = example
+        # print('len(ratings[:, 0]):',len(ratings[:, 0]))
+        # print('len(ratings[:, 1]):', len(ratings[:, 1]))
+        # print('len(pos_neighborhoods):', len(pos_neighborhoods))
+        # print('len(neg_neighborhoods):', len(neg_neighborhoods))
         feed = {
             model.input_users: ratings[:, 0],
 
@@ -288,7 +289,7 @@ for i in range(FLAGS.iters):
                                                                                                                                      users_per_batch=users_per_batch)
     results.append([np.mean(loss), test_loss, hrs[1], hrs_low[1], hrs_medium[1], hrs_high[1]])
     print('_________________________________________________________________________________________')
-    print('RESULTS AT Epoch {} ({} - path: {}):'.format(i, dataset, sv.save_path))
+    print('RESULTS AT Epoch {} ({} - path: {}):'.format(i, dataset_str, sv.save_path))
     print('Ep.\t\tLoss\t\t\tTest Loss\t\t\tHR@5\t\tHR_LOW@5\tHR_MED@5\tHR_HIGH@5')
     for row in range(len(results)):
         print(row,

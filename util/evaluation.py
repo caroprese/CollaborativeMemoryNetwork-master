@@ -68,16 +68,35 @@ def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_ite
     """
     test_data = dict([positive, np.array[negatives]])
     """
-    print('USERS PER BATCH:', users_per_batch)
+    # print('USERS PER BATCH:', users_per_batch)
     out = ''
     scores = []  # n x 101 (punteggi) dove n e' il numero di utenti. Cosa succede se voglio piu' oggetti per ogni utente?
     items = []
     losses = []
+
     progress = tqdm(test_data.items(), total=len(test_data), leave=False, desc=u'Evaluate || ')
 
     user_count = 0
 
     number_of_evaluated_items = None
+
+    assert len(input_user_list) == 0
+    assert len(input_item_list) == 0
+    assert len(input_neighborhood_list) == 0
+    assert len(input_neighborhood_lengths_list) == 0
+
+    assert len(loss_input_user_list) == 0
+    assert len(loss_input_item_list) == 0
+    assert len(loss_input_items_negative_list) == 0
+
+    assert len(loss_input_neighborhoods_list) == 0
+    assert len(loss_input_neighborhood_lengths_list) == 0
+
+    assert len(loss_input_neighborhoods_negative_list) == 0
+    assert len(loss_input_neighborhood_lengths_negative_list) == 0
+
+    assert len(loss_input_positive_items_popularity_list) == 0
+    assert len(loss_input_negative_items_popularity_list) == 0
 
     for user, (pos_list, neg) in progress:
 
@@ -225,6 +244,8 @@ def get_model_scores(sess, test_data, neighborhood, input_user_handle, input_ite
         loss = sess.run(model.loss, feed_loss)
         losses.append(loss)
 
+        reset_lists()
+
     scores = np.asarray(scores).reshape(-1, number_of_evaluated_items)
     items = np.asarray(items).reshape(-1, number_of_evaluated_items)
 
@@ -244,6 +265,7 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
                    dropout_handle, score_op, max_neighbors, model,
                    EVAL_AT=[1, 5, 10], users_per_batch=100):
     # print('users_per_batch:',users_per_batch)
+
     scores, items, out, test_loss = get_model_scores(sess, test_data, neighborhood, input_user_handle, input_item_handle,
                                                      input_neighborhood_handle,
                                                      input_neighborhood_lengths_handle,
@@ -269,6 +291,7 @@ def evaluate_model(sess, test_data, neighborhood, input_user_handle, input_item_
     hrs_high = []
     s = '\n'
     for k in EVAL_AT:
+
         hr, custom_hr, weighted_hr, ndcg, hits, normalized_hits, hr_low, hr_medium, hr_high, n_pop = get_eval(scores, items, len(scores[0]) - 1, k)
 
         '''
@@ -358,7 +381,12 @@ def get_eval(scores, items, index, top_n=10):
         else:
             n_high += 1
 
+    # print('n_low:', n_low)
+    # print('n_medium:', n_medium)
+    # print('n_high:', n_high)
+
     # print('len(scores):', len(scores))
+
     assert n_low + n_medium + n_high == len(scores)
 
     # for score in scores:
